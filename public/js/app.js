@@ -180,6 +180,9 @@ class BookManager {
 
     noDataMessage.classList.add('hidden');
     
+    // Check if user is authenticated
+    const isAuthenticated = window.authManager && window.authManager.isAuthenticated();
+    
     tbody.innerHTML = this.books.map(book => `
       <tr class="hover:bg-gray-50 transition-colors duration-150">
         <td class="px-6 py-4 whitespace-nowrap">
@@ -211,14 +214,26 @@ class BookManager {
         </td>
         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
           <div class="flex justify-end space-x-2">
-            <button onclick="bookManager.editBook(${book.id})" 
-                    class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors duration-150">
-              <i class="fas fa-edit"></i>
+            <!-- View button - always visible -->
+            <button onclick="bookManager.viewBook(${book.id})" 
+                    class="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50 transition-colors duration-150"
+                    title="View book details">
+              <i class="fas fa-eye"></i>
             </button>
-            <button onclick="bookManager.deleteBook(${book.id})" 
-                    class="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors duration-150">
-              <i class="fas fa-trash"></i>
-            </button>
+            ${isAuthenticated ? `
+              <!-- Edit button - only for authenticated users -->
+              <button onclick="bookManager.editBook(${book.id})" 
+                      class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors duration-150"
+                      title="Edit book">
+                <i class="fas fa-edit"></i>
+              </button>
+              <!-- Delete button - only for authenticated users -->
+              <button onclick="bookManager.deleteBook(${book.id})" 
+                      class="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors duration-150"
+                      title="Delete book">
+                <i class="fas fa-trash"></i>
+              </button>
+            ` : ''}
           </div>
         </td>
       </tr>
@@ -336,9 +351,15 @@ class BookManager {
     this.loadBooks();
   }
 
-  openModal(book = null) {
+  openModal(book = null, viewMode = false) {
     if (!this.dbConnected) {
       this.showError('Database not connected. Please reconnect first.');
+      return;
+    }
+
+    // Check authentication only for add/edit modes
+    if (!viewMode && (!window.authManager || !window.authManager.isAuthenticated())) {
+      this.showError('Please login to add or edit books.');
       return;
     }
 
@@ -346,9 +367,31 @@ class BookManager {
     const modalContent = document.getElementById('modalContent');
     const title = document.getElementById('modalTitle');
     const form = document.getElementById('bookForm');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+
+    // Get all input fields
+    const inputs = form.querySelectorAll('input, select, textarea');
+
+    if (viewMode) {
+      title.textContent = 'View Book Details';
+      // Disable all inputs
+      inputs.forEach(input => input.disabled = true);
+      // Hide save button, change cancel to close
+      saveBtn.style.display = 'none';
+      cancelBtn.textContent = 'Close';
+    } else {
+      // Enable all inputs
+      inputs.forEach(input => input.disabled = false);
+      // Show save button, restore cancel text
+      saveBtn.style.display = 'block';
+      cancelBtn.textContent = 'Cancel';
+    }
 
     if (book) {
-      title.textContent = 'Edit Book';
+      if (!viewMode) {
+        title.textContent = 'Edit Book';
+      }
       document.getElementById('bookId').value = book.id;
       document.getElementById('bookTitle').value = book.title;
       document.getElementById('bookAuthor').value = book.author;
@@ -373,10 +416,12 @@ class BookManager {
       modalContent.classList.add('modal-content-enter-active');
     });
 
-    // Focus on title input after animation starts
-    setTimeout(() => {
-      document.getElementById('bookTitle').focus();
-    }, 50);
+    // Focus on title input after animation starts (only if not in view mode)
+    if (!viewMode) {
+      setTimeout(() => {
+        document.getElementById('bookTitle').focus();
+      }, 50);
+    }
   }
 
   closeModal() {
@@ -399,7 +444,19 @@ class BookManager {
       modal.classList.add('hidden');
       modal.classList.remove('modal-exit', 'modal-exit-active');
       modalContent.classList.remove('modal-content-exit', 'modal-content-exit-active');
-      document.getElementById('bookForm').reset();
+      
+      // Reset form
+      const form = document.getElementById('bookForm');
+      form.reset();
+      
+      // Reset form state (re-enable inputs, restore buttons)
+      const inputs = form.querySelectorAll('input, select, textarea');
+      inputs.forEach(input => input.disabled = false);
+      
+      const saveBtn = document.getElementById('saveBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+      saveBtn.style.display = 'block';
+      cancelBtn.textContent = 'Cancel';
     }, 300);
   }
 
@@ -408,6 +465,12 @@ class BookManager {
     
     if (!this.dbConnected) {
       this.showError('Database not connected. Please reconnect first.');
+      return;
+    }
+
+    // Check authentication
+    if (!window.authManager || !window.authManager.isAuthenticated()) {
+      this.showError('Please login to add or edit books.');
       return;
     }
     
@@ -427,7 +490,8 @@ class BookManager {
       const response = await fetch(url, {
         method,
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...window.authManager.getAuthHeader()
         },
         body: JSON.stringify(bookData)
       });
@@ -439,7 +503,11 @@ class BookManager {
         this.closeModal();
         this.loadBooks();
       } else {
-        this.showError(result.message || 'Failed to save book');
+        if (response.status === 401) {
+          this.showError('Please login to perform this action.');
+        } else {
+          this.showError(result.message || 'Failed to save book');
+        }
       }
     } catch (error) {
       console.error('Error saving book:', error);
@@ -474,6 +542,12 @@ class BookManager {
       return;
     }
 
+    // Check authentication
+    if (!window.authManager || !window.authManager.isAuthenticated()) {
+      this.showError('Please login to delete books.');
+      return;
+    }
+
     const result = await Swal.fire({
       title: 'Are you sure?',
       text: 'This action cannot be undone!',
@@ -488,7 +562,8 @@ class BookManager {
     if (result.isConfirmed) {
       try {
         const response = await fetch(`/api/books/${id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: window.authManager.getAuthHeader()
         });
 
         const result = await response.json();
@@ -497,7 +572,11 @@ class BookManager {
           this.showSuccess('Book deleted successfully');
           this.loadBooks();
         } else {
-          this.showError('Failed to delete book');
+          if (response.status === 401) {
+            this.showError('Please login to perform this action.');
+          } else {
+            this.showError('Failed to delete book');
+          }
         }
       } catch (error) {
         console.error('Error deleting book:', error);
@@ -568,7 +647,29 @@ class BookManager {
       day: 'numeric'
     });
   }
+
+  // New method for viewing book details
+  async viewBook(id) {
+    if (!this.dbConnected) {
+      this.showError('Database not connected. Please reconnect first.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/books/${id}`);
+      const result = await response.json();
+
+      if (result.success) {
+        this.openModal(result.data, true); // true = view mode
+      } else {
+        this.showError('Failed to load book details');
+      }
+    } catch (error) {
+      console.error('Error loading book:', error);
+      this.showError('Failed to load book details');
+    }
+  }
 }
 
-// Initialize the application
-const bookManager = new BookManager(); 
+// BookManager class is defined above
+// Instance will be created in the main HTML file 

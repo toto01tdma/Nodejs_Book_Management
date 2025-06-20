@@ -63,6 +63,10 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
    DB_PASSWORD=your_password
    PORT=3000
    NODE_ENV=development
+   
+   # JWT Configuration
+   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+   JWT_EXPIRES_IN=24h
    ```
    
    **For MySQL:**
@@ -75,6 +79,10 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
    DB_PASSWORD=your_password
    PORT=3000
    NODE_ENV=development
+   
+   # JWT Configuration
+   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+   JWT_EXPIRES_IN=24h
    ```
 
 5. **Build CSS assets**
@@ -98,23 +106,37 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 
 ## 📖 Usage
 
+### Authentication
+- **Registration**: Click "Register" to create a new account with username, email, and password
+- **Login**: Click "Login" to access your account
+- **User Roles**: 
+  - **User**: Can view all books but cannot add, edit, or delete
+  - **Admin**: Full access to all features including user management
+- **Default Admin**: Use the sample admin account (email: `admin@bookmanagement.com`, password: `Admin123!`)
+
 ### Dashboard
 - View overall statistics of your book collection
 - See total books, authors, genres, and recent additions
-- Quick access to add new books
+- Quick access to add new books (requires authentication)
 
 ### Managing Books
-- **Add Books**: Click the "Add New Book" button to add a new book
-- **Search Books**: Use the search bar to find books by title or author
-- **Filter Books**: Filter by genre, author, or publication year
-- **Edit Books**: Click the edit icon to modify book details
-- **Delete Books**: Click the delete icon to remove books (with confirmation)
+- **Add Books**: Click the "Add New Book" button to add a new book (requires login)
+- **Search Books**: Use the search bar to find books by title or author (available to all)
+- **Filter Books**: Filter by genre, author, or publication year (available to all)
+- **Edit Books**: Click the edit icon to modify book details (requires login)
+- **Delete Books**: Click the delete icon to remove books (requires login)
+
+### User Management (Admin Only)
+- **View Users**: Access the admin panel to see all registered users
+- **Change Roles**: Promote users to admin or demote admins to users
+- **Delete Users**: Remove user accounts (cannot delete your own account)
 
 ### Advanced Features
 - **Pagination**: Navigate through large collections efficiently
 - **Sorting**: Books are sorted by creation date (newest first)
 - **Responsive Grid**: Adjusts to different screen sizes
 - **Real-time Updates**: Statistics update automatically after operations
+- **Secure Authentication**: JWT-based authentication with role-based access control
 
 ## 🛠️ API Endpoints
 
@@ -124,6 +146,15 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 - `POST /api/books` - Create a new book
 - `PUT /api/books/:id` - Update a book
 - `DELETE /api/books/:id` - Delete a book
+
+### Authentication
+- `POST /api/auth/register` - Register a new user
+- `POST /api/auth/login` - Login user
+- `POST /api/auth/logout` - Logout user
+- `GET /api/auth/me` - Get current user info
+- `GET /api/auth/users` - Get all users (admin only)
+- `DELETE /api/auth/users/:id` - Delete user (admin only)
+- `PUT /api/auth/users/:id/role` - Update user role (admin only)
 
 ### Filters & Statistics
 - `GET /api/books/filters/genres` - Get all unique genres
@@ -138,6 +169,12 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 - `author` - Filter by author
 - `year` - Filter by publication year
 
+### Authentication Headers
+For protected routes, include the JWT token in the Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
+```
+
 ## 🗂️ Project Structure
 
 ```
@@ -147,11 +184,15 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 │   ├── postgresql.sql       # PostgreSQL database setup
 │   └── mysql.sql            # MySQL database setup
 ├── middleware/
+│   ├── authMiddleware.ts    # JWT authentication middleware
 │   └── dbMiddleware.ts      # Database middleware for API protection
 ├── models/
 │   ├── Book.ts              # Book interfaces and types
-│   └── BookService.ts       # Book service layer with business logic
+│   ├── BookService.ts       # Book service layer with business logic
+│   ├── User.ts              # User interfaces and types
+│   └── UserService.ts       # User service layer with authentication logic
 ├── routes/
+│   ├── authRoutes.ts        # Authentication routes (login, register, user management)
 │   ├── bookRoutes.ts        # API routes for book operations
 │   └── dbStatus.ts          # Database status and reconnection routes
 ├── views/
@@ -160,7 +201,8 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 │   ├── css/
 │   │   └── style.css        # Compiled Tailwind CSS
 │   └── js/
-│       └── app.js           # Frontend JavaScript
+│       ├── app.js           # Main frontend JavaScript
+│       └── auth.js          # Authentication frontend JavaScript
 ├── src/
 │   └── input.css            # Tailwind CSS source
 ├── server.ts                # Main server file

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { testConnection, initDatabase, getConnectionStatus, getDatabaseType } from './config/database';
 import bookRoutes from './routes/bookRoutes';
+import authRoutes from './routes/authRoutes';
 import dbStatusRoutes from './routes/dbStatus';
 import { BookService } from './models/BookService';
 
@@ -25,6 +26,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // API Routes
 app.use('/api/books', bookRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/db', dbStatusRoutes);
 
 // Frontend Routes

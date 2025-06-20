@@ -2,6 +2,7 @@ import express from 'express';
 import { body, query, param, validationResult } from 'express-validator';
 import { BookService } from '../models/BookService';
 import { requireDatabase } from '../middleware/dbMiddleware';
+import { authenticateToken, optionalAuth } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
@@ -74,6 +75,7 @@ router.get('/filters/authors', requireDatabase, async (req: express.Request, res
 // GET /api/books - Get all books with filtering and pagination
 router.get('/', [
   requireDatabase,
+  optionalAuth,
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().trim(),
@@ -122,8 +124,8 @@ router.get('/:id', requireDatabase, validateId, handleValidationErrors, async (r
   }
 });
 
-// POST /api/books - Create a new book
-router.post('/', requireDatabase, validateBook, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
+// POST /api/books - Create a new book (authentication required)
+router.post('/', requireDatabase, authenticateToken, validateBook, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const bookData = {
       title: req.body.title,
@@ -140,8 +142,8 @@ router.post('/', requireDatabase, validateBook, handleValidationErrors, async (r
   }
 });
 
-// PUT /api/books/:id - Update a book
-router.put('/:id', requireDatabase, [...validateId, ...validateBookUpdate], handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
+// PUT /api/books/:id - Update a book (authentication required)
+router.put('/:id', requireDatabase, authenticateToken, [...validateId, ...validateBookUpdate], handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     const updateData = {
@@ -172,8 +174,8 @@ router.put('/:id', requireDatabase, [...validateId, ...validateBookUpdate], hand
   }
 });
 
-// DELETE /api/books/:id - Delete a book
-router.delete('/:id', requireDatabase, validateId, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
+// DELETE /api/books/:id - Delete a book (authentication required)
+router.delete('/:id', requireDatabase, authenticateToken, validateId, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     const deleted = await BookService.deleteBook(id);
