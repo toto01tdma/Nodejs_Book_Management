@@ -9,6 +9,12 @@ class BookManager {
     this.totalPages = 0;
     this.total = 0;
     this.dbConnected = window.initialDbStatus || false;
+    
+    // Performance optimizations
+    this.requestCache = new Map(); // Cache for API requests
+    this.pendingRequests = new Map(); // Prevent duplicate requests
+    this.lastRenderTime = 0; // Throttle rendering
+    this.renderThrottleMs = 16; // ~60fps
 
     this.initializeEventListeners();
     this.initializeApp();
@@ -20,34 +26,41 @@ class BookManager {
   }
 
   initializeEventListeners() {
-    // Modal controls
+    // Book management
     document.getElementById('addBookBtn').addEventListener('click', () => this.openModal());
     document.getElementById('closeModal').addEventListener('click', () => this.closeModal());
     document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
     document.getElementById('bookForm').addEventListener('submit', (e) => this.saveBook(e));
 
-    // Database connection retry
+    // Database retry
     const retryBtn = document.getElementById('retryConnectionBtn');
     if (retryBtn) {
       retryBtn.addEventListener('click', () => this.retryDatabaseConnection());
     }
 
-    // Search and filters
-    document.getElementById('searchInput').addEventListener('input', this.debounce(() => this.applyFilters(), 300));
-    document.getElementById('genreFilter').addEventListener('change', () => this.applyFilters());
-    document.getElementById('authorFilter').addEventListener('change', () => this.applyFilters());
-    document.getElementById('yearFilter').addEventListener('input', this.debounce(() => this.applyFilters(), 300));
-    document.getElementById('limitSelect').addEventListener('change', () => this.changeLimit());
-    document.getElementById('clearFilters').addEventListener('click', () => this.clearFilters());
+    // Search and filters - optimized with debouncing
+    const searchInput = document.getElementById('searchInput');
+    const genreFilter = document.getElementById('genreFilter');
+    const authorFilter = document.getElementById('authorFilter');
+    const yearFilter = document.getElementById('yearFilter');
+    const limitSelect = document.getElementById('limitSelect');
+    const clearFilters = document.getElementById('clearFilters');
 
-    // Close modal on backdrop click
+    if (searchInput) searchInput.addEventListener('input', this.debounce(() => this.applyFilters(), 300));
+    if (genreFilter) genreFilter.addEventListener('change', () => this.applyFilters());
+    if (authorFilter) authorFilter.addEventListener('change', () => this.applyFilters());
+    if (yearFilter) yearFilter.addEventListener('input', this.debounce(() => this.applyFilters(), 300));
+    if (limitSelect) limitSelect.addEventListener('change', () => this.changeLimit());
+    if (clearFilters) clearFilters.addEventListener('click', () => this.clearFilters());
+
+    // Modal click outside to close
     document.getElementById('bookModal').addEventListener('click', (e) => {
       if (e.target.id === 'bookModal') {
         this.closeModal();
       }
     });
 
-    // Escape key to close modal
+    // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         this.closeModal();
@@ -56,11 +69,18 @@ class BookManager {
   }
 
   async checkDatabaseStatus() {
+    const cacheKey = 'db_status';
+    const cached = this.getFromCache(cacheKey, 5000); // 5 second cache
+    if (cached !== null) {
+      this.dbConnected = cached;
+      return cached;
+    }
+
     try {
       const response = await fetch('/api/db/status');
       const result = await response.json();
       this.dbConnected = result.connected;
-    //   console.log('Database status checked:', result.connected);
+      this.setCache(cacheKey, result.connected);
       return result.connected;
     } catch (error) {
       console.error('Error checking database status:', error);
@@ -71,10 +91,10 @@ class BookManager {
 
   async retryDatabaseConnection() {
     const retryBtn = document.getElementById('retryConnectionBtn');
-    const retryIcon = retryBtn.querySelector('i');
+    const retryIcon = retryBtn?.querySelector('i');
     
-    retryBtn.disabled = true;
-    retryIcon.classList.add('fa-spin');
+    if (retryBtn) retryBtn.disabled = true;
+    if (retryIcon) retryIcon.classList.add('fa-spin');
     
     try {
       const response = await fetch('/api/db/reconnect', { method: 'POST' });
@@ -82,7 +102,6 @@ class BookManager {
       
       if (result.success && result.connected) {
         this.showSuccess('Database reconnected successfully!');
-        // Reload the page to update the UI
         setTimeout(() => {
           window.location.reload();
         }, 1000);
@@ -93,11 +112,12 @@ class BookManager {
       console.error('Error retrying database connection:', error);
       this.showError('Failed to reconnect to database.');
     } finally {
-      retryBtn.disabled = false;
-      retryIcon.classList.remove('fa-spin');
+      if (retryBtn) retryBtn.disabled = false;
+      if (retryIcon) retryIcon.classList.remove('fa-spin');
     }
   }
 
+  // Optimized debounce with cleanup
   debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -110,6 +130,49 @@ class BookManager {
     };
   }
 
+  // Request caching and deduplication
+  getFromCache(key, maxAge = 30000) {
+    const cached = this.requestCache.get(key);
+    if (cached && (Date.now() - cached.timestamp) < maxAge) {
+      return cached.data;
+    }
+    return null;
+  }
+
+  setCache(key, data) {
+    this.requestCache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+    
+    // Cleanup old cache entries
+    if (this.requestCache.size > 50) {
+      const oldestKey = this.requestCache.keys().next().value;
+      this.requestCache.delete(oldestKey);
+    }
+  }
+
+  // Prevent duplicate requests
+  async makeRequest(url, options = {}) {
+    const requestKey = `${options.method || 'GET'}_${url}`;
+    
+    // Return pending request if exists
+    if (this.pendingRequests.has(requestKey)) {
+      return this.pendingRequests.get(requestKey);
+    }
+
+    // Make new request
+    const requestPromise = fetch(url, options);
+    this.pendingRequests.set(requestKey, requestPromise);
+
+    try {
+      const response = await requestPromise;
+      return response;
+    } finally {
+      this.pendingRequests.delete(requestKey);
+    }
+  }
+
   async loadBooks() {
     if (!this.dbConnected) {
       this.showNoDatabaseMessage();
@@ -120,20 +183,31 @@ class BookManager {
       this.showLoading(true);
       
       const params = new URLSearchParams({
-        page: this.currentPage,
-        limit: this.limit,
+        page: this.currentPage.toString(),
+        limit: this.limit.toString(),
         ...this.filters
       });
 
-      const response = await fetch(`/api/books?${params}`);
-      const result = await response.json();
+      const cacheKey = `books_${params.toString()}`;
+      const cached = this.getFromCache(cacheKey, 10000); // 10 second cache
+      
+      let result;
+      if (cached) {
+        result = cached;
+      } else {
+        const response = await this.makeRequest(`/api/books?${params}`);
+        result = await response.json();
+        
+        if (result.success) {
+          this.setCache(cacheKey, result);
+        }
+      }
 
       if (result.success) {
         this.books = result.data;
         this.totalPages = result.totalPages;
         this.total = result.total;
-        this.renderBooks();
-        this.renderPagination();
+        this.throttledRender();
         this.updateStats();
       } else {
         if (result.error === 'SERVICE_UNAVAILABLE') {
@@ -150,204 +224,245 @@ class BookManager {
     }
   }
 
-  showNoDatabaseMessage() {
-    const tbody = document.getElementById('booksTableBody');
-    const noDataMessage = document.getElementById('noBooksMessage');
+  // Throttled rendering for better performance
+  throttledRender() {
+    const now = Date.now();
+    if (now - this.lastRenderTime < this.renderThrottleMs) {
+      return;
+    }
     
-    tbody.innerHTML = '';
-    noDataMessage.innerHTML = `
-      <i class="fas fa-database text-6xl text-red-300 mb-4"></i>
-      <p class="text-red-500 text-lg">Database not connected</p>
-      <p class="text-red-400 text-sm">Please check your database configuration and try again</p>
-    `;
-    noDataMessage.classList.remove('hidden');
+    this.lastRenderTime = now;
+    this.renderBooks();
+    this.renderPagination();
   }
 
+  showNoDatabaseMessage() {
+    const tbody = document.getElementById('booksTableBody');
+    const noBooksMessage = document.getElementById('noBooksMessage');
+    const pagination = document.getElementById('pagination');
+    
+    if (tbody) tbody.innerHTML = '';
+    if (noBooksMessage) noBooksMessage.classList.remove('hidden');
+    if (pagination) pagination.classList.add('hidden');
+  }
+
+  // Optimized DOM rendering
   renderBooks() {
     const tbody = document.getElementById('booksTableBody');
-    const noDataMessage = document.getElementById('noBooksMessage');
+    const noBooksMessage = document.getElementById('noBooksMessage');
+    
+    if (!tbody) return;
 
     if (this.books.length === 0) {
       tbody.innerHTML = '';
-      noDataMessage.innerHTML = `
-        <i class="fas fa-book-open text-6xl text-gray-300 mb-4"></i>
-        <p class="text-gray-500 text-lg">No books found</p>
-        <p class="text-gray-400 text-sm">Try adjusting your search criteria or add a new book</p>
-      `;
-      noDataMessage.classList.remove('hidden');
+      if (noBooksMessage) noBooksMessage.classList.remove('hidden');
       return;
     }
 
-    noDataMessage.classList.add('hidden');
+    if (noBooksMessage) noBooksMessage.classList.add('hidden');
+
+    // Use DocumentFragment for better performance
+    const fragment = document.createDocumentFragment();
     
-    // Check if user is authenticated
-    const isAuthenticated = window.authManager && window.authManager.isAuthenticated();
-    
-    tbody.innerHTML = this.books.map(book => `
-      <tr class="hover:bg-gray-50 transition-colors duration-150">
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="flex items-center">
-            <div class="flex-shrink-0 h-10 w-10">
-              <div class="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <i class="fas fa-book text-blue-600"></i>
-              </div>
-            </div>
-            <div class="ml-4">
-              <div class="text-sm font-medium text-gray-900">${this.escapeHtml(book.title)}</div>
-              <div class="text-sm text-gray-500">ID: ${book.id}</div>
-            </div>
-          </div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <div class="text-sm font-medium text-gray-900">${this.escapeHtml(book.author)}</div>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap">
-          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-            ${book.genre || 'Unspecified'}
-          </span>
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-          ${book.published_year || '-'}
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-          ${this.formatDate(book.created_at)}
-        </td>
-        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-          <div class="flex justify-end space-x-2">
-            <!-- View button - always visible -->
-            <button onclick="bookManager.viewBook(${book.id})" 
-                    class="text-gray-600 hover:text-gray-900 p-1 rounded hover:bg-gray-50 transition-colors duration-150"
-                    title="View book details">
-              <i class="fas fa-eye"></i>
-            </button>
-            ${isAuthenticated ? `
-              <!-- Edit button - only for authenticated users -->
-              <button onclick="bookManager.editBook(${book.id})" 
-                      class="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50 transition-colors duration-150"
-                      title="Edit book">
-                <i class="fas fa-edit"></i>
-              </button>
-              <!-- Delete button - only for authenticated users -->
-              <button onclick="bookManager.deleteBook(${book.id})" 
-                      class="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50 transition-colors duration-150"
-                      title="Delete book">
-                <i class="fas fa-trash"></i>
-              </button>
-            ` : ''}
-          </div>
-        </td>
-      </tr>
-    `).join('');
+    this.books.forEach(book => {
+      const row = document.createElement('tr');
+      row.className = 'hover:bg-gray-50 transition-colors duration-150';
+      
+      // Create cells more efficiently
+      row.innerHTML = this.createBookRowHTML(book);
+      fragment.appendChild(row);
+    });
+
+    // Single DOM update
+    tbody.innerHTML = '';
+    tbody.appendChild(fragment);
   }
 
-  renderPagination() {
-    const paginationContainer = document.getElementById('paginationButtons');
-    const showingFrom = ((this.currentPage - 1) * this.limit) + 1;
-    const showingTo = Math.min(this.currentPage * this.limit, this.total);
+  // Separate method for creating book row HTML
+  createBookRowHTML(book) {
+    const isAuthenticated = window.authManager?.isAuthenticated() || false;
+    
+    return `
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm font-medium text-gray-900">${this.escapeHtml(book.title)}</div>
+        <div class="text-sm text-gray-500">ID: ${book.id}</div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <div class="text-sm text-gray-900">${this.escapeHtml(book.author)}</div>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          ${book.genre ? this.escapeHtml(book.genre) : 'N/A'}
+        </span>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        ${book.published_year || 'N/A'}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        ${this.formatDate(book.created_at)}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <div class="flex justify-end space-x-2">
+          <button onclick="bookManager.viewBook(${book.id})" class="text-blue-600 hover:text-blue-900 transition-colors duration-150">
+            <i class="fas fa-eye"></i>
+          </button>
+          ${isAuthenticated ? `
+            <button onclick="bookManager.editBook(${book.id})" class="text-indigo-600 hover:text-indigo-900 transition-colors duration-150">
+              <i class="fas fa-edit"></i>
+            </button>
+            <button onclick="bookManager.deleteBook(${book.id})" class="text-red-600 hover:text-red-900 transition-colors duration-150">
+              <i class="fas fa-trash"></i>
+            </button>
+          ` : ''}
+        </div>
+      </td>
+    `;
+  }
 
-    document.getElementById('showingFrom').textContent = this.total > 0 ? showingFrom : 0;
-    document.getElementById('showingTo').textContent = showingTo;
-    document.getElementById('totalRecords').textContent = this.total;
+  // Optimized pagination rendering
+  renderPagination() {
+    const pagination = document.getElementById('pagination');
+    const showingFrom = document.getElementById('showingFrom');
+    const showingTo = document.getElementById('showingTo');
+    const totalRecords = document.getElementById('totalRecords');
+    const paginationButtons = document.getElementById('paginationButtons');
+    
+    if (!pagination) return;
 
     if (this.totalPages <= 1) {
-      paginationContainer.innerHTML = '';
+      pagination.classList.add('hidden');
       return;
     }
 
-    let paginationHTML = '';
+    pagination.classList.remove('hidden');
 
+    // Update showing info
+    const from = (this.currentPage - 1) * this.limit + 1;
+    const to = Math.min(this.currentPage * this.limit, this.total);
+    
+    if (showingFrom) showingFrom.textContent = from.toString();
+    if (showingTo) showingTo.textContent = to.toString();
+    if (totalRecords) totalRecords.textContent = this.total.toString();
+
+    // Generate pagination buttons efficiently
+    if (paginationButtons) {
+      paginationButtons.innerHTML = this.generatePaginationHTML();
+    }
+  }
+
+  // Separate method for pagination HTML generation
+  generatePaginationHTML() {
+    let html = '';
+    
     // Previous button
-    if (this.currentPage > 1) {
-      paginationHTML += `
-        <button onclick="bookManager.goToPage(${this.currentPage - 1})" 
-                class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
-          <i class="fas fa-chevron-left"></i>
-        </button>
-      `;
+    html += `
+      <button onclick="bookManager.goToPage(${this.currentPage - 1})" 
+              class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 ${this.currentPage === 1 ? 'cursor-not-allowed opacity-50' : ''}" 
+              ${this.currentPage === 1 ? 'disabled' : ''}>
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    `;
+
+    // Page numbers (optimized for large page counts)
+    const maxVisiblePages = 7;
+    let startPage = Math.max(1, this.currentPage - Math.floor(maxVisiblePages / 2));
+    let endPage = Math.min(this.totalPages, startPage + maxVisiblePages - 1);
+    
+    if (endPage - startPage < maxVisiblePages - 1) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1);
     }
 
-    // Page numbers
-    const startPage = Math.max(1, this.currentPage - 2);
-    const endPage = Math.min(this.totalPages, this.currentPage + 2);
-
+    // First page + ellipsis
     if (startPage > 1) {
-      paginationHTML += `
-        <button onclick="bookManager.goToPage(1)" 
-                class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">1</button>
-      `;
+      html += this.createPageButton(1);
       if (startPage > 2) {
-        paginationHTML += '<span class="px-3 py-1 text-gray-500">...</span>';
+        html += '<span class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300">...</span>';
       }
     }
 
+    // Visible pages
     for (let i = startPage; i <= endPage; i++) {
-      const isActive = i === this.currentPage;
-      paginationHTML += `
-        <button onclick="bookManager.goToPage(${i})" 
-                class="px-3 py-1 border rounded-md text-sm ${isActive 
-                  ? 'bg-blue-600 text-white border-blue-600' 
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'}">${i}</button>
-      `;
+      html += this.createPageButton(i);
     }
 
+    // Ellipsis + last page
     if (endPage < this.totalPages) {
       if (endPage < this.totalPages - 1) {
-        paginationHTML += '<span class="px-3 py-1 text-gray-500">...</span>';
+        html += '<span class="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300">...</span>';
       }
-      paginationHTML += `
-        <button onclick="bookManager.goToPage(${this.totalPages})" 
-                class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">${this.totalPages}</button>
-      `;
+      html += this.createPageButton(this.totalPages);
     }
 
     // Next button
-    if (this.currentPage < this.totalPages) {
-      paginationHTML += `
-        <button onclick="bookManager.goToPage(${this.currentPage + 1})" 
-                class="px-3 py-1 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50">
-          <i class="fas fa-chevron-right"></i>
-        </button>
-      `;
-    }
+    html += `
+      <button onclick="bookManager.goToPage(${this.currentPage + 1})" 
+              class="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-r-md hover:bg-gray-50 ${this.currentPage === this.totalPages ? 'cursor-not-allowed opacity-50' : ''}" 
+              ${this.currentPage === this.totalPages ? 'disabled' : ''}>
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    `;
 
-    paginationContainer.innerHTML = paginationHTML;
+    return html;
+  }
+
+  createPageButton(pageNum) {
+    const isActive = pageNum === this.currentPage;
+    return `
+      <button onclick="bookManager.goToPage(${pageNum})" 
+              class="px-3 py-2 text-sm font-medium ${isActive ? 'text-blue-600 bg-blue-50 border-blue-500' : 'text-gray-500 bg-white hover:bg-gray-50'} border border-gray-300">
+        ${pageNum}
+      </button>
+    `;
   }
 
   goToPage(page) {
+    if (page < 1 || page > this.totalPages || page === this.currentPage) return;
     this.currentPage = page;
     this.loadBooks();
   }
 
   changeLimit() {
-    this.limit = parseInt(document.getElementById('limitSelect').value);
-    this.currentPage = 1;
-    this.loadBooks();
+    const limitSelect = document.getElementById('limitSelect');
+    if (limitSelect) {
+      this.limit = parseInt(limitSelect.value);
+      this.currentPage = 1;
+      this.requestCache.clear(); // Clear cache when limit changes
+      this.loadBooks();
+    }
   }
 
   applyFilters() {
-    this.filters = {};
+    const newFilters = {};
     
-    const search = document.getElementById('searchInput').value.trim();
-    const genre = document.getElementById('genreFilter').value;
-    const author = document.getElementById('authorFilter').value;
-    const year = document.getElementById('yearFilter').value;
+    const search = document.getElementById('searchInput')?.value.trim();
+    const genre = document.getElementById('genreFilter')?.value;
+    const author = document.getElementById('authorFilter')?.value;
+    const year = document.getElementById('yearFilter')?.value;
 
-    if (search) this.filters.search = search;
-    if (genre) this.filters.genre = genre;
-    if (author) this.filters.author = author;
-    if (year) this.filters.year = year;
+    if (search) newFilters.search = search;
+    if (genre) newFilters.genre = genre;
+    if (author) newFilters.author = author;
+    if (year) newFilters.year = year;
 
-    this.currentPage = 1;
-    this.loadBooks();
+    // Only reload if filters actually changed
+    if (JSON.stringify(this.filters) !== JSON.stringify(newFilters)) {
+      this.filters = newFilters;
+      this.currentPage = 1;
+      this.requestCache.clear(); // Clear cache when filters change
+      this.loadBooks();
+    }
   }
 
   clearFilters() {
-    document.getElementById('searchInput').value = '';
-    document.getElementById('genreFilter').value = '';
-    document.getElementById('authorFilter').value = '';
-    document.getElementById('yearFilter').value = '';
+    const elements = ['searchInput', 'genreFilter', 'authorFilter', 'yearFilter'];
+    elements.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) element.value = '';
+    });
+    
     this.filters = {};
     this.currentPage = 1;
+    this.requestCache.clear();
     this.loadBooks();
   }
 
@@ -501,7 +616,13 @@ class BookManager {
       if (result.success) {
         this.showSuccess(result.message);
         this.closeModal();
-        this.loadBooks();
+        
+        // Clear cache to ensure fresh data
+        this.requestCache.clear();
+        
+        // Reload books and update stats
+        await this.loadBooks();
+        this.updateStats();
       } else {
         if (response.status === 401) {
           this.showError('Please login to perform this action.');
@@ -570,7 +691,13 @@ class BookManager {
 
         if (result.success) {
           this.showSuccess('Book deleted successfully');
-          this.loadBooks();
+          
+          // Clear cache to ensure fresh data
+          this.requestCache.clear();
+          
+          // Reload books and update stats
+          await this.loadBooks();
+          this.updateStats();
         } else {
           if (response.status === 401) {
             this.showError('Please login to perform this action.');
@@ -588,15 +715,30 @@ class BookManager {
   async updateStats() {
     if (!this.dbConnected) return;
 
+    const cacheKey = 'stats';
+    const cached = this.getFromCache(cacheKey, 30000); // 30 second cache
+    
     try {
-      const response = await fetch('/api/books/stats');
-      const result = await response.json();
+      let result;
+      if (cached) {
+        result = cached;
+      } else {
+        const response = await this.makeRequest('/api/books/stats');
+        result = await response.json();
+        
+        if (result.success) {
+          this.setCache(cacheKey, result);
+        }
+      }
       
       if (result.success) {
-        document.getElementById('totalBooks').textContent = result.data.totalBooks;
-        document.getElementById('totalAuthors').textContent = result.data.totalAuthors;
-        document.getElementById('totalGenres').textContent = result.data.totalGenres;
-        document.getElementById('recentBooks').textContent = result.data.recentBooks;
+        const elements = ['totalBooks', 'totalAuthors', 'totalGenres', 'recentBooks'];
+        elements.forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.textContent = result.data[id] || '0';
+          }
+        });
       }
     } catch (error) {
       console.error('Error updating stats:', error);

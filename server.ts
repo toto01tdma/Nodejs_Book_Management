@@ -8,6 +8,10 @@ import authRoutes from './routes/authRoutes';
 import dbStatusRoutes from './routes/dbStatus';
 import { BookService } from './models/BookService';
 
+// Import logging
+import logger, { logInfo, logError } from './config/logger';
+import { httpLogger, responseTimeMiddleware, errorLogger } from './middleware/loggingMiddleware';
+
 // Load environment variables
 dotenv.config();
 
@@ -15,6 +19,8 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+app.use(responseTimeMiddleware); // Add response time tracking
+app.use(httpLogger); // HTTP request logging
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -57,7 +63,7 @@ app.get('/', async (req, res) => {
       dbConnected: true
     });
   } catch (error) {
-    console.error('Error loading dashboard:', error);
+    logError('Error loading dashboard', error);
     res.render('index', { 
       title: 'Book Management System',
       stats: { totalBooks: 0, totalAuthors: 0, totalGenres: 0, recentBooks: 0 },
@@ -79,31 +85,40 @@ app.use((req, res) => {
 });
 
 // Error handler
+app.use(errorLogger); // Log errors with request context
 app.use((error: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled error:', error);
+  logError('Unhandled error', error);
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
 // Initialize database and start server
 async function startServer() {
+  logInfo('Starting Book Management System server...');
+  
   // Test database connection
   const dbConnected = await testConnection();
   
   if (dbConnected) {
     // Initialize database tables
     await initDatabase();
+    logInfo('Database connected and initialized successfully');
   } else {
-    console.log('⚠️  Server will start without database connection');
+    logError('Server starting without database connection');
   }
   
   // Start server regardless of database status
   app.listen(port, () => {
-    console.log(`🚀 Server running at http://localhost:${port}`);
-    console.log(`🗄️  Database type: ${getDatabaseType().toUpperCase()}`);
+    logInfo(`Server running at http://localhost:${port}`, {
+      port,
+      databaseType: getDatabaseType().toUpperCase(),
+      databaseConnected: dbConnected,
+      nodeEnv: process.env.NODE_ENV || 'development'
+    });
+    
     if (dbConnected) {
-      console.log(`📚 Book Management System is ready!`);
+      logInfo('Book Management System is ready!');
     } else {
-      console.log(`⚠️  Book Management System started with limited functionality (no database)`);
+      logError('Book Management System started with limited functionality (no database)');
     }
   });
 }

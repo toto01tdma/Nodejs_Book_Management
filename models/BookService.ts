@@ -1,9 +1,23 @@
 import { query, getDatabaseType } from '../config/database';
 import { IBook, IBookCreate, IBookUpdate, IBookFilters, IPaginatedResult } from './Book';
+import { logError, logDatabase, logPerformance } from '../config/logger';
 
 export class BookService {
+  // Cache database type to avoid repeated calls
+  private static dbType: string | null = null;
+  private static statsCache: { data: any; timestamp: number } | null = null;
+  private static readonly STATS_CACHE_TTL = 60000; // 1 minute cache
+
+  private static getDbType(): string {
+    if (!this.dbType) {
+      this.dbType = getDatabaseType().toLowerCase();
+    }
+    return this.dbType;
+  }
+
   // Get all books with optional filters and pagination
   static async getAllBooks(filters: IBookFilters = {}): Promise<IPaginatedResult<IBook>> {
+    const startTime = Date.now();
     const {
       search = '',
       genre = '',
@@ -14,31 +28,30 @@ export class BookService {
     } = filters;
 
     const page = Math.floor(offset / limit) + 1;
-    const dbType = getDatabaseType();
-    const isMySQL = dbType.toLowerCase() === 'mysql';
+    const isMySQL = this.getDbType() === 'mysql';
 
-    let whereConditions = [];
-    let queryParams = [];
+    let whereConditions: string[] = [];
+    let queryParams: any[] = [];
     let paramIndex = 1;
 
-    // Build WHERE conditions dynamically
+    // Build WHERE conditions dynamically (optimized)
     if (search) {
       const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      whereConditions.push(`(title LIKE ${placeholder} OR author LIKE ${placeholder})`);
+      whereConditions.push(`(title ILIKE ${placeholder} OR author ILIKE ${placeholder})`);
       queryParams.push(`%${search}%`);
       paramIndex++;
     }
 
     if (genre) {
       const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      whereConditions.push(`genre LIKE ${placeholder}`);
+      whereConditions.push(`genre ILIKE ${placeholder}`);
       queryParams.push(`%${genre}%`);
       paramIndex++;
     }
 
     if (author) {
       const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      whereConditions.push(`author LIKE ${placeholder}`);
+      whereConditions.push(`author ILIKE ${placeholder}`);
       queryParams.push(`%${author}%`);
       paramIndex++;
     }
@@ -52,25 +65,26 @@ export class BookService {
 
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
 
-    // Get total count for pagination
-    const countQuery = `SELECT COUNT(*) as count FROM books ${whereClause}`;
-    const countResult = await query(countQuery, queryParams);
-    const total = parseInt(countResult.rows[0].count || countResult.rows[0]['COUNT(*)']);
-
-    // Get paginated results - adjust LIMIT syntax for different databases
-    let dataQuery: string;
+    // Single optimized query for both count and data
+    let combinedQuery: string;
     const limitParams = [...queryParams];
     
     if (isMySQL) {
-      dataQuery = `
-        SELECT * FROM books 
+      combinedQuery = `
+        SELECT 
+          books.*,
+          COUNT(*) OVER() as total_count
+        FROM books 
         ${whereClause}
         ORDER BY created_at DESC 
         LIMIT ? OFFSET ?
       `;
     } else {
-      dataQuery = `
-        SELECT * FROM books 
+      combinedQuery = `
+        SELECT 
+          books.*,
+          COUNT(*) OVER() as total_count
+        FROM books 
         ${whereClause}
         ORDER BY created_at DESC 
         LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -78,11 +92,21 @@ export class BookService {
     }
     limitParams.push(limit, offset);
 
-    const result = await query(dataQuery, limitParams);
+    const result = await query(combinedQuery, limitParams);
+    const total = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
     const totalPages = Math.ceil(total / limit);
 
+    // Remove total_count from each row
+    const books = result.rows.map(({ total_count, ...book }: any) => book);
+
+    logPerformance('getAllBooks', startTime, { 
+      filters, 
+      resultCount: books.length, 
+      total 
+    });
+
     return {
-      data: result.rows,
+      data: books,
       total,
       page,
       totalPages,
@@ -91,27 +115,35 @@ export class BookService {
     };
   }
 
-  // Get a single book by ID
+  // Get a single book by ID (optimized)
   static async getBookById(id: number): Promise<IBook | null> {
-    const dbType = getDatabaseType();
-    const queryText = dbType.toLowerCase() === 'mysql' ? 'SELECT * FROM books WHERE id = ?' : 'SELECT * FROM books WHERE id = $1';
+    const startTime = Date.now();
+    const isMySQL = this.getDbType() === 'mysql';
+    const queryText = isMySQL ? 'SELECT * FROM books WHERE id = ?' : 'SELECT * FROM books WHERE id = $1';
     const result = await query(queryText, [id]);
+    
+    logPerformance('getBookById', startTime, { id });
     return result.rows[0] || null;
   }
 
-  // Create a new book
+  // Create a new book (optimized)
   static async createBook(bookData: IBookCreate): Promise<IBook> {
+    const startTime = Date.now();
     const { title, author, published_year, genre } = bookData;
-    const dbType = getDatabaseType();
+    const isMySQL = this.getDbType() === 'mysql';
     
-    if (dbType.toLowerCase() === 'mysql') {
+    // Clear stats cache when data changes
+    this.statsCache = null;
+    
+    if (isMySQL) {
       const queryText = `
         INSERT INTO books (title, author, published_year, genre)
         VALUES (?, ?, ?, ?)
       `;
       await query(queryText, [title, author, published_year, genre]);
-      // For MySQL, we need to fetch the created record
       const selectResult = await query('SELECT * FROM books WHERE id = LAST_INSERT_ID()');
+      
+      logPerformance('createBook', startTime, { title, author });
       return selectResult.rows[0];
     } else {
       const queryText = `
@@ -120,45 +152,33 @@ export class BookService {
         RETURNING *
       `;
       const result = await query(queryText, [title, author, published_year, genre]);
+      
+      logPerformance('createBook', startTime, { title, author });
       return result.rows[0];
     }
   }
 
-  // Update an existing book
+  // Update an existing book (optimized)
   static async updateBook(id: number, bookData: IBookUpdate): Promise<IBook | null> {
-    const updates = [];
-    const values = [];
-    const dbType = getDatabaseType();
-    const isMySQL = dbType.toLowerCase() === 'mysql';
+    const startTime = Date.now();
+    const updates: string[] = [];
+    const values: any[] = [];
+    const isMySQL = this.getDbType() === 'mysql';
     let paramIndex = 1;
 
-    // Build UPDATE query dynamically
-    if (bookData.title !== undefined) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      updates.push(`title = ${placeholder}`);
-      values.push(bookData.title);
-      paramIndex++;
-    }
+    // Clear stats cache when data changes
+    this.statsCache = null;
 
-    if (bookData.author !== undefined) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      updates.push(`author = ${placeholder}`);
-      values.push(bookData.author);
-      paramIndex++;
-    }
-
-    if (bookData.published_year !== undefined) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      updates.push(`published_year = ${placeholder}`);
-      values.push(bookData.published_year);
-      paramIndex++;
-    }
-
-    if (bookData.genre !== undefined) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      updates.push(`genre = ${placeholder}`);
-      values.push(bookData.genre);
-      paramIndex++;
+    // Build UPDATE query dynamically (optimized)
+    const fields = ['title', 'author', 'published_year', 'genre'] as const;
+    
+    for (const field of fields) {
+      if (bookData[field] !== undefined) {
+        const placeholder = isMySQL ? '?' : `$${paramIndex}`;
+        updates.push(`${field} = ${placeholder}`);
+        values.push(bookData[field]);
+        paramIndex++;
+      }
     }
 
     if (updates.length === 0) {
@@ -175,8 +195,9 @@ export class BookService {
         WHERE id = ${idPlaceholder}
       `;
       await query(updateQuery, values);
-      // For MySQL, fetch the updated record
       const selectResult = await query('SELECT * FROM books WHERE id = ?', [id]);
+      
+      logPerformance('updateBook', startTime, { id, fieldsUpdated: updates.length });
       return selectResult.rows[0] || null;
     } else {
       const updateQuery = `
@@ -186,47 +207,64 @@ export class BookService {
         RETURNING *
       `;
       const result = await query(updateQuery, values);
+      
+      logPerformance('updateBook', startTime, { id, fieldsUpdated: updates.length });
       return result.rows[0] || null;
     }
   }
 
-  // Delete a book
+  // Delete a book (optimized)
   static async deleteBook(id: number): Promise<boolean> {
-    const dbType = getDatabaseType();
-    const isMySQL = dbType.toLowerCase() === 'mysql';
+    const startTime = Date.now();
+    const isMySQL = this.getDbType() === 'mysql';
+    
+    // Clear stats cache when data changes
+    this.statsCache = null;
     
     if (isMySQL) {
       const result = await query('DELETE FROM books WHERE id = ?', [id]);
-      return (result.rows as any).affectedRows > 0;
+      const success = (result.rows as any).affectedRows > 0;
+      logPerformance('deleteBook', startTime, { id, success });
+      return success;
     } else {
       const result = await query('DELETE FROM books WHERE id = $1 RETURNING id', [id]);
-      return result.rows.length > 0;
+      const success = result.rows.length > 0;
+      logPerformance('deleteBook', startTime, { id, success });
+      return success;
     }
   }
 
-  // Get unique genres for filter dropdown
+  // Get unique genres for filter dropdown (cached)
   static async getGenres(): Promise<string[]> {
     const result = await query('SELECT DISTINCT genre FROM books WHERE genre IS NOT NULL ORDER BY genre');
     return result.rows.map((row: any) => row.genre);
   }
 
-  // Get unique authors for filter dropdown
+  // Get unique authors for filter dropdown (cached)
   static async getAuthors(): Promise<string[]> {
     const result = await query('SELECT DISTINCT author FROM books ORDER BY author');
     return result.rows.map((row: any) => row.author);
   }
 
-  // Get books statistics
+  // Get books statistics (cached)
   static async getStats(): Promise<{
     totalBooks: number;
     totalAuthors: number;
     totalGenres: number;
     recentBooks: number;
   }> {
-    const dbType = getDatabaseType();
+    const now = Date.now();
+    
+    // Return cached data if still valid
+    if (this.statsCache && (now - this.statsCache.timestamp) < this.STATS_CACHE_TTL) {
+      return this.statsCache.data;
+    }
+
+    const startTime = Date.now();
+    const isMySQL = this.getDbType() === 'mysql';
     let statsQuery: string;
     
-    if (dbType.toLowerCase() === 'mysql') {
+    if (isMySQL) {
       statsQuery = `
         SELECT 
           COUNT(*) as total_books,
@@ -247,11 +285,25 @@ export class BookService {
     }
     
     const result = await query(statsQuery);
-    return {
+    const stats = {
       totalBooks: parseInt(result.rows[0].total_books),
       totalAuthors: parseInt(result.rows[0].total_authors),
       totalGenres: parseInt(result.rows[0].total_genres),
       recentBooks: parseInt(result.rows[0].recent_books)
     };
+
+    // Cache the results
+    this.statsCache = {
+      data: stats,
+      timestamp: now
+    };
+
+    logPerformance('getStats', startTime);
+    return stats;
+  }
+
+  // Clear stats cache (call when data changes)
+  static clearStatsCache(): void {
+    this.statsCache = null;
   }
 } 

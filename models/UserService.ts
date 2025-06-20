@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query, getDatabaseType } from '../config/database';
 import { IUser, IUserCreate, IUserLogin, IUserResponse, IAuthResponse, IJWTPayload } from './User';
+import { logError, logAuth, logDatabase } from '../config/logger';
 
 export class UserService {
   private static readonly JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -63,7 +64,7 @@ export class UserService {
         };
       }
     } catch (error) {
-      console.error('Error registering user:', error);
+      logError('Error registering user', error, { email: userData.email, username: userData.username });
       return {
         success: false,
         message: 'Failed to register user'
@@ -104,6 +105,8 @@ export class UserService {
 
       const userResponse = this.formatUserResponse(user);
 
+      logAuth('User login successful', email, { username: user.username, role: user.role });
+
       return {
         success: true,
         message: 'Login successful',
@@ -111,7 +114,7 @@ export class UserService {
         token
       };
     } catch (error) {
-      console.error('Error logging in user:', error);
+      logError('Error logging in user', error, { email });
       return {
         success: false,
         message: 'Failed to login'

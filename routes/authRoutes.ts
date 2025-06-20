@@ -3,6 +3,8 @@ import { body, param, validationResult } from 'express-validator';
 import { UserService } from '../models/UserService';
 import { authenticateToken, requireAdmin, requireOwnershipOrAdmin } from '../middleware/authMiddleware';
 import { requireDatabase } from '../middleware/dbMiddleware';
+import { logError, logAuth } from '../config/logger';
+import { logSensitiveOperation } from '../middleware/loggingMiddleware';
 
 const router = express.Router();
 
@@ -62,7 +64,7 @@ const handleValidationErrors = (req: express.Request, res: express.Response, nex
 };
 
 // POST /api/auth/register - Register a new user
-router.post('/register', requireDatabase, validateRegister, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
+router.post('/register', requireDatabase, logSensitiveOperation('user_registration'), validateRegister, handleValidationErrors, async (req: express.Request, res: express.Response): Promise<void> => {
   try {
     const { username, email, password, role } = req.body;
     
@@ -79,7 +81,7 @@ router.post('/register', requireDatabase, validateRegister, handleValidationErro
       res.status(400).json(result);
     }
   } catch (error) {
-    console.error('Error in register route:', error);
+    logError('Error in register route', error, { email: req.body.email, username: req.body.username });
     res.status(500).json({
       success: false,
       message: 'Internal server error'

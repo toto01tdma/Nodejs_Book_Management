@@ -175,17 +175,109 @@ For protected routes, include the JWT token in the Authorization header:
 Authorization: Bearer <your-jwt-token>
 ```
 
+## 📊 Logging and Monitoring
+
+The application includes a comprehensive logging system built with Winston for production-ready monitoring and debugging.
+
+### Log Levels
+- **error**: Application errors and exceptions
+- **warn**: Warning messages and potential issues
+- **info**: General application information and important events
+- **http**: HTTP request/response logging
+- **debug**: Detailed debugging information
+
+### Log Files
+All logs are stored in the `logs/` directory:
+
+- **`app.log`**: All application logs (rotated at 5MB, keeps 5 files)
+- **`error.log`**: Error-level logs only (rotated at 5MB, keeps 5 files)
+- **`http.log`**: HTTP request logs (rotated at 5MB, keeps 3 files)
+- **`exceptions.log`**: Uncaught exceptions
+- **`rejections.log`**: Unhandled promise rejections
+
+### Log Configuration
+Set the log level using the `LOG_LEVEL` environment variable:
+```env
+LOG_LEVEL=info  # Options: error, warn, info, http, debug
+```
+
+### Structured Logging
+The system uses structured JSON logging with the following information:
+- **Timestamp**: ISO format with timezone
+- **Level**: Log level (error, warn, info, etc.)
+- **Message**: Human-readable message
+- **Metadata**: Additional context (user info, request details, etc.)
+- **Stack traces**: For errors and exceptions
+
+### HTTP Request Logging
+Every HTTP request is logged with:
+- IP address (handles proxy forwarding)
+- User information (username and role)
+- Request method and URL
+- Response status and size
+- Response time
+- User agent and referrer
+- Request body size
+
+### Authentication Logging
+Security-sensitive operations are logged:
+- User registration and login attempts
+- Role changes and user management
+- Failed authentication attempts
+- Sensitive operations (admin actions)
+
+### Performance Monitoring
+- Response time tracking for all requests
+- Database operation timing
+- Performance bottleneck identification
+
+### Log Format Examples
+
+**Console Output (Development):**
+```
+2024-01-15 10:30:45 [info]: Server running at http://localhost:3000 {"port":3000,"databaseType":"POSTGRESQL","databaseConnected":true}
+2024-01-15 10:30:50 [http]: 127.0.0.1 - anonymous [15/Jan/2024:10:30:50 +0000] "GET / HTTP/1.1" 200 1234 "-" "Mozilla/5.0..." 45ms 0
+2024-01-15 10:31:00 [info]: Auth: User login successful {"action":"User login successful","user":"john@example.com","username":"john","role":"user"}
+```
+
+**JSON Output (Production logs):**
+```json
+{
+  "timestamp": "2024-01-15 10:30:45",
+  "level": "info",
+  "message": "Server running at http://localhost:3000",
+  "port": 3000,
+  "databaseType": "POSTGRESQL",
+  "databaseConnected": true
+}
+```
+
+### Monitoring Best Practices
+1. **Log Rotation**: Automatic rotation prevents disk space issues
+2. **Structured Data**: JSON format enables easy parsing and analysis
+3. **Security**: Sensitive data (passwords, tokens) are never logged
+4. **Performance**: Minimal impact on application performance
+5. **Compliance**: Logs help with audit trails and compliance requirements
+
 ## 🗂️ Project Structure
 
 ```
 ├── config/
-│   └── database.ts          # Database configuration and connection
+│   ├── database.ts          # Database configuration and connection
+│   └── logger.ts            # Winston logging configuration
 ├── import_database/         # Database setup queries
 │   ├── postgresql.sql       # PostgreSQL database setup
 │   └── mysql.sql            # MySQL database setup
+├── logs/                    # Application logs (auto-created)
+│   ├── app.log              # All application logs
+│   ├── error.log            # Error logs only
+│   ├── http.log             # HTTP request logs
+│   ├── exceptions.log       # Uncaught exceptions
+│   └── rejections.log       # Unhandled promise rejections
 ├── middleware/
 │   ├── authMiddleware.ts    # JWT authentication middleware
-│   └── dbMiddleware.ts      # Database middleware for API protection
+│   ├── dbMiddleware.ts      # Database middleware for API protection
+│   └── loggingMiddleware.ts # HTTP logging and error tracking middleware
 ├── models/
 │   ├── Book.ts              # Book interfaces and types
 │   ├── BookService.ts       # Book service layer with business logic
