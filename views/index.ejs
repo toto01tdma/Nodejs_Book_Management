@@ -7,6 +7,48 @@
   <link href="/css/style.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    /* Modal Animation Classes */
+    .modal-enter {
+      opacity: 0;
+    }
+    
+    .modal-enter-active {
+      opacity: 1;
+      transition: opacity 300ms ease-out;
+    }
+    
+    .modal-exit {
+      opacity: 1;
+    }
+    
+    .modal-exit-active {
+      opacity: 0;
+      transition: opacity 300ms ease-out;
+    }
+    
+    .modal-content-enter {
+      transform: translateY(100px) scale(0.95);
+      opacity: 0;
+    }
+    
+    .modal-content-enter-active {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+      transition: all 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    .modal-content-exit {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    
+    .modal-content-exit-active {
+      transform: translateY(100px) scale(0.95);
+      opacity: 0;
+      transition: all 300ms ease-in;
+    }
+  </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
   <!-- Header -->
@@ -198,8 +240,8 @@
   </main>
 
   <!-- Add/Edit Book Modal -->
-  <div id="bookModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl max-w-md w-full max-h-screen overflow-y-auto">
+  <div id="bookModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4 transition-opacity duration-300">
+    <div id="modalContent" class="bg-white rounded-xl max-w-md w-full max-h-screen overflow-y-auto transform transition-all duration-300 ease-out">
       <div class="p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 id="modalTitle" class="text-xl font-semibold text-gray-900">Add New Book</h3>

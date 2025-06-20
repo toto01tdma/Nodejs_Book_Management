@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
-import { testConnection, initDatabase, getConnectionStatus } from './config/database';
+import { testConnection, initDatabase, getConnectionStatus, getDatabaseType } from './config/database';
 import bookRoutes from './routes/bookRoutes';
 import dbStatusRoutes from './routes/dbStatus';
 import { BookService } from './models/BookService';
@@ -97,6 +97,7 @@ async function startServer() {
   // Start server regardless of database status
   app.listen(port, () => {
     console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log(`🗄️  Database type: ${getDatabaseType().toUpperCase()}`);
     if (dbConnected) {
       console.log(`📚 Book Management System is ready!`);
     } else {

@@ -343,6 +343,7 @@ class BookManager {
     }
 
     const modal = document.getElementById('bookModal');
+    const modalContent = document.getElementById('modalContent');
     const title = document.getElementById('modalTitle');
     const form = document.getElementById('bookForm');
 
@@ -359,13 +360,47 @@ class BookManager {
       document.getElementById('bookId').value = '';
     }
 
+    // Show modal with animation
     modal.classList.remove('hidden');
-    document.getElementById('bookTitle').focus();
+    modal.classList.add('modal-enter');
+    modalContent.classList.add('modal-content-enter');
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+      modal.classList.remove('modal-enter');
+      modal.classList.add('modal-enter-active');
+      modalContent.classList.remove('modal-content-enter');
+      modalContent.classList.add('modal-content-enter-active');
+    });
+
+    // Focus on title input after animation starts
+    setTimeout(() => {
+      document.getElementById('bookTitle').focus();
+    }, 50);
   }
 
   closeModal() {
-    document.getElementById('bookModal').classList.add('hidden');
-    document.getElementById('bookForm').reset();
+    const modal = document.getElementById('bookModal');
+    const modalContent = document.getElementById('modalContent');
+    
+    // Start exit animation
+    modal.classList.add('modal-exit');
+    modalContent.classList.add('modal-content-exit');
+    
+    requestAnimationFrame(() => {
+      modal.classList.remove('modal-enter-active');
+      modal.classList.add('modal-exit-active');
+      modalContent.classList.remove('modal-content-enter-active');
+      modalContent.classList.add('modal-content-exit-active');
+    });
+    
+    // Hide modal after animation completes
+    setTimeout(() => {
+      modal.classList.add('hidden');
+      modal.classList.remove('modal-exit', 'modal-exit-active');
+      modalContent.classList.remove('modal-content-exit', 'modal-content-exit-active');
+      document.getElementById('bookForm').reset();
+    }, 300);
   }
 
   async saveBook(e) {

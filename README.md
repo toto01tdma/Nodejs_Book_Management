@@ -2,30 +2,6 @@
 
 A full-featured Book Management System built with Node.js, Express, PostgreSQL, and a modern web interface. This system provides complete CRUD (Create, Read, Update, Delete) functionality for managing a book collection.
 
-![Book Management System](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
-![Express.js](https://img.shields.io/badge/Express.js-000000?style=for-the-badge&logo=express&logoColor=white)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
-
-## 🌟 Features
-
-### Core Functionality
-- ✅ **Full CRUD Operations**: Create, Read, Update, and Delete books
-- 🔍 **Advanced Search & Filtering**: Search by title, author, genre, and publication year
-- 📄 **Pagination**: Efficient handling of large book collections
-- 📊 **Dashboard Statistics**: Real-time stats showing total books, authors, genres, and recent additions
-- 🎨 **Modern UI/UX**: Clean, responsive design with Tailwind CSS
-- 📱 **Mobile Responsive**: Works perfectly on all device sizes
-
-### Technical Features
-- 🛡️ **Input Validation**: Server-side validation using express-validator
-- 🔒 **SQL Injection Protection**: Parameterized queries for security
-- ⚡ **Performance Optimized**: Efficient database queries with indexing
-- 🔄 **Auto-updated Timestamps**: Automatic tracking of creation and modification times
-- 📝 **TypeScript Support**: Full type safety throughout the application
-- 🎯 **RESTful API**: Clean, well-structured API endpoints
-
 ## 🏗️ Architecture
 
 ### Backend (Node.js/Express)
@@ -41,24 +17,11 @@ A full-featured Book Management System built with Node.js, Express, PostgreSQL, 
 - **UI Components**: Custom components with Font Awesome icons
 - **Notifications**: SweetAlert2 for beautiful alerts and confirmations
 
-### Database Schema
-```sql
-CREATE TABLE books (
-  id SERIAL PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  author VARCHAR(255) NOT NULL,
-  published_year INTEGER,
-  genre VARCHAR(100),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js (v16 or higher)
-- PostgreSQL (v12 or higher)
+- **Database**: PostgreSQL (v12 or higher) **OR** MySQL (v8.0 or higher)
 - npm or yarn
 
 ### Installation
@@ -74,18 +37,41 @@ CREATE TABLE books (
    npm install
    ```
 
-3. **Set up PostgreSQL database**
+3. **Set up your database**
+   
+   **For PostgreSQL:**
    - Create a new PostgreSQL database named `book_management`
+   - Optionally, run the setup queries from `import_database/postgresql.sql`
+   - Note your database credentials
+   
+   **For MySQL:**
+   - Create a new MySQL database named `book_management`
+   - Optionally, run the setup queries from `import_database/mysql.sql`
    - Note your database credentials
 
 4. **Configure environment variables**
-   - Copy `.env.example` to `.env`
+   - Create a `.env` file in your project root
    - Update the database configuration:
+   
+   **For PostgreSQL (default):**
    ```env
+   DB_TYPE=postgresql
    DB_HOST=localhost
    DB_PORT=5432
    DB_NAME=book_management
    DB_USER=your_username
+   DB_PASSWORD=your_password
+   PORT=3000
+   NODE_ENV=development
+   ```
+   
+   **For MySQL:**
+   ```env
+   DB_TYPE=mysql
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_NAME=book_management
+   DB_USER=root
    DB_PASSWORD=your_password
    PORT=3000
    NODE_ENV=development
@@ -157,11 +143,17 @@ CREATE TABLE books (
 ```
 ├── config/
 │   └── database.ts          # Database configuration and connection
+├── import_database/         # Database setup queries
+│   ├── postgresql.sql       # PostgreSQL database setup
+│   └── mysql.sql            # MySQL database setup
+├── middleware/
+│   └── dbMiddleware.ts      # Database middleware for API protection
 ├── models/
 │   ├── Book.ts              # Book interfaces and types
 │   └── BookService.ts       # Book service layer with business logic
 ├── routes/
-│   └── bookRoutes.ts        # API routes for book operations
+│   ├── bookRoutes.ts        # API routes for book operations
+│   └── dbStatus.ts          # Database status and reconnection routes
 ├── views/
 │   └── index.ejs            # Main frontend template
 ├── public/
@@ -180,10 +172,34 @@ CREATE TABLE books (
 
 ## 🔧 Configuration
 
-### Database Configuration
-The application uses PostgreSQL with connection pooling. Configure your database in the `.env` file:
+### Database Setup Queries
+The `import_database/` folder contains pre-written SQL queries for database setup:
 
+- **`postgresql.sql`** - PostgreSQL-specific setup queries and sample data
+- **`mysql.sql`** - MySQL-specific setup queries and sample data
+
+You can run these files to quickly set up your database with the required tables and optionally populate it with sample data.
+
+**To import the queries:**
+
+For PostgreSQL:
+```bash
+psql -U your_username -d book_management -f import_database/postgresql.sql
+```
+
+For MySQL:
+```bash
+mysql -u your_username -p book_management < import_database/mysql.sql
+```
+
+> **Note:** The application will automatically create the `books` table if it doesn't exist, so running these import files is optional but recommended for testing with sample data.
+
+### Database Configuration
+The application supports both PostgreSQL and MySQL with connection pooling. Configure your database in the `.env` file:
+
+**PostgreSQL Configuration:**
 ```env
+DB_TYPE=postgresql
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=book_management
@@ -191,11 +207,22 @@ DB_USER=your_username
 DB_PASSWORD=your_password
 ```
 
+**MySQL Configuration:**
+```env
+DB_TYPE=mysql
+DB_HOST=localhost
+DB_PORT=3306
+DB_NAME=book_management
+DB_USER=root
+DB_PASSWORD=your_password
+```
+
 ### Environment Variables
+- `DB_TYPE` - Database type (postgresql or mysql, default: postgresql)
 - `PORT` - Server port (default: 3000)
 - `NODE_ENV` - Environment (development/production)
 - `DB_*` - Database configuration
-- `DATABASE_URL` - Alternative database URL format
+- `DATABASE_URL` - Alternative database URL format (PostgreSQL only)
 
 ## 🧪 Development
 
