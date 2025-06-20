@@ -1,10 +1,8 @@
 import express from 'express';
 import { body, query, param, validationResult } from 'express-validator';
-import { BookService } from '../models/BookService';
+import { BookService } from '../services/BookService';
 import { requireDatabase } from '../middleware/dbMiddleware';
 import { authenticateToken, optionalAuth } from '../middleware/authMiddleware';
-import { logError, logDatabase } from '../config/logger';
-import { logSensitiveOperation } from '../middleware/loggingMiddleware';
 
 const router = express.Router();
 

@@ -6,10 +6,10 @@ import { testConnection, initDatabase, getConnectionStatus, getDatabaseType } fr
 import bookRoutes from './routes/bookRoutes';
 import authRoutes from './routes/authRoutes';
 import dbStatusRoutes from './routes/dbStatus';
-import { BookService } from './models/BookService';
+import { BookService } from './services/BookService';
 
 // Import logging
-import logger, { logInfo, logError } from './config/logger';
+import { logInfo, logError } from './config/logger';
 import { httpLogger, responseTimeMiddleware, errorLogger } from './middleware/loggingMiddleware';
 
 // Load environment variables

@@ -1,5 +1,5 @@
 import express from 'express';
-import { UserService } from '../models/UserService';
+import { UserService } from '../services/UserService';
 import { IJWTPayload } from '../models/User';
 
 // Extend Express Request interface to include user

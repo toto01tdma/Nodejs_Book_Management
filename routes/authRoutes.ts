@@ -1,9 +1,9 @@
 import express from 'express';
 import { body, param, validationResult } from 'express-validator';
-import { UserService } from '../models/UserService';
+import { UserService } from '../services/UserService';
 import { authenticateToken, requireAdmin, requireOwnershipOrAdmin } from '../middleware/authMiddleware';
 import { requireDatabase } from '../middleware/dbMiddleware';
-import { logError, logAuth } from '../config/logger';
+import { logError } from '../config/logger';
 import { logSensitiveOperation } from '../middleware/loggingMiddleware';
 
 const router = express.Router();

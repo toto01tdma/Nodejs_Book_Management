@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query, getDatabaseType } from '../config/database';
-import { IUser, IUserCreate, IUserLogin, IUserResponse, IAuthResponse, IJWTPayload } from './User';
-import { logError, logAuth, logDatabase } from '../config/logger';
+import { IUser, IUserCreate, IUserLogin, IUserResponse, IAuthResponse, IJWTPayload } from '../models/User';
+import { logError, logAuth } from '../config/logger';
 
 export class UserService {
   private static readonly JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';

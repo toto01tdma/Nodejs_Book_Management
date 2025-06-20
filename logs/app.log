@@ -125,3 +125,44 @@
 {"duration":"16ms","id":20,"level":"info","message":"Performance: deleteBook","operation":"deleteBook","success":true,"timestamp":"2025-06-20 23:44:57"}
 {"duration":"2ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:44:57","total":13}
 {"duration":"9ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-20 23:44:57"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:49:17"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:49:17"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:49:17"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:49:17"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:49:59"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:50:00"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:50:00"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:50:00"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:50:15"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:50:16"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:50:16"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:50:16"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:50:22"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:50:23"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:50:23"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:50:23"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:50:43"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:50:44"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:50:44"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:50:44"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:50:51"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:50:52"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:50:52"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:50:52"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-20 23:51:08"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-20 23:51:08"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-20 23:51:08"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-20 23:51:08"}
+{"duration":"10ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-20 23:51:49"}
+{"duration":"5ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:51:49","total":13}
+{"author":"y","duration":"4ms","level":"info","message":"Performance: createBook","operation":"createBook","timestamp":"2025-06-20 23:51:56","title":"y"}
+{"duration":"1ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:51:56","total":14}
+{"duration":"2ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-20 23:51:56"}
+{"duration":"0ms","id":21,"level":"info","message":"Performance: getBookById","operation":"getBookById","timestamp":"2025-06-20 23:51:57"}
+{"duration":"4ms","fieldsUpdated":4,"id":21,"level":"info","message":"Performance: updateBook","operation":"updateBook","timestamp":"2025-06-20 23:51:59"}
+{"duration":"1ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:51:59","total":14}
+{"duration":"2ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-20 23:51:59"}
+{"duration":"1ms","id":21,"level":"info","message":"Performance: deleteBook","operation":"deleteBook","success":true,"timestamp":"2025-06-20 23:52:03"}
+{"duration":"2ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:52:03","total":13}
+{"duration":"1ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-20 23:52:03"}
+{"duration":"3ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-20 23:52:05","total":13}

@@ -1,6 +1,6 @@
 import { query, getDatabaseType } from '../config/database';
-import { IBook, IBookCreate, IBookUpdate, IBookFilters, IPaginatedResult } from './Book';
-import { logError, logDatabase, logPerformance } from '../config/logger';
+import { IBook, IBookCreate, IBookUpdate, IBookFilters, IPaginatedResult } from '../models/Book';
+import { logPerformance } from '../config/logger';
 
 export class BookService {
   // Cache database type to avoid repeated calls
