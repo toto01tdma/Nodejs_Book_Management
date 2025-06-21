@@ -150,7 +150,7 @@ Book Management System built with Node.js, Express, TypeScript, and modern web t
 - **Role Management**: 
   - **User**: Can view all books, cannot modify
   - **Admin**: Full access including user management
-- **Default Admin**: `admin@bookmanagement.com` / `Admin123!`
+- **Default Admin**: `admin@bookmanagement.com` / `1234567890`
 
 ### Book Management
 - **View Books**: Browse with pagination, search, and filtering (all users)
