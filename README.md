@@ -1,6 +1,6 @@
 # 📚 Book Management System
 
-A high-performance, production-ready Book Management System built with Node.js, Express, TypeScript, and modern web technologies. Features comprehensive CRUD operations, advanced authentication, memory optimization, multi-select filtering with search, and enterprise-grade logging with performance monitoring.
+Book Management System built with Node.js, Express, TypeScript, and modern web technologies. Features comprehensive CRUD operations, advanced authentication, memory optimization, multi-select filtering with search, and enterprise-grade logging with performance monitoring.
 
 ## 🏗️ Architecture
 
@@ -785,6 +785,274 @@ DB_QUERY_TIMEOUT=20000              # 20 seconds (reduced from 30 seconds)
 - **Memory Management**: Reduced cache size (30 entries) with 5-minute cleanup cycles
 - **Connection Monitoring**: Built-in health checks and reconnection logic
 - **Performance Monitoring**: Real-time memory usage tracking and slow operation detection
+
+## 🧪 Unit Testing
+
+### Testing Framework Setup
+This project uses **Jest** with **TypeScript** support for comprehensive unit and integration testing. The testing suite covers:
+
+- **Service Layer**: Business logic testing with mocked database operations
+- **Middleware**: Authentication, database connection, and logging middleware
+- **Route Handlers**: API endpoint testing with request/response validation
+- **Database Operations**: Connection handling and query optimization
+- **Error Handling**: Comprehensive error scenario coverage
+
+### Test Structure
+```
+tests/
+├── setup.ts                    # Test environment configuration
+├── services/                   # Service layer unit tests
+│   ├── BookService.test.ts     # Book management operations
+│   └── UserService.test.ts     # User authentication & management
+├── middleware/                 # Middleware unit tests
+│   ├── authMiddleware.test.ts  # Authentication & authorization
+│   └── dbMiddleware.test.ts    # Database connection middleware
+├── routes/                     # Integration tests
+│   ├── bookRoutes.test.ts      # Book API endpoints
+│   └── authRoutes.test.ts      # Authentication API endpoints
+└── config/                     # Configuration tests
+    └── database.test.ts        # Database configuration
+```
+
+### Running Tests
+
+#### Basic Test Commands
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode (development)
+npm run test:watch
+
+# Run tests with coverage report
+npm run test:coverage
+
+# Run tests for CI/CD (no watch, with coverage)
+npm run test:ci
+```
+
+#### Test-Specific Commands
+```bash
+# Run specific test file
+npx jest tests/services/BookService.test.ts
+
+# Run tests matching pattern
+npx jest --testNamePattern="BookService"
+
+# Run tests with verbose output
+npx jest --verbose
+
+# Run tests and update snapshots
+npx jest --updateSnapshot
+```
+
+### Test Coverage
+The test suite aims for comprehensive coverage:
+
+- **Services**: 95%+ coverage of business logic
+- **Middleware**: 100% coverage of authentication and validation
+- **Routes**: 90%+ coverage of API endpoints
+- **Error Handling**: Complete error scenario coverage
+
+#### Coverage Reports
+```bash
+# Generate HTML coverage report
+npm run test:coverage
+
+# View coverage report
+open coverage/lcov-report/index.html  # macOS/Linux
+start coverage/lcov-report/index.html # Windows
+```
+
+### Test Configuration
+
+#### Jest Configuration (`jest.config.js`)
+```javascript
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/tests'],
+  collectCoverageFrom: [
+    'services/**/*.ts',
+    'middleware/**/*.ts',
+    'routes/**/*.ts',
+    'config/**/*.ts',
+    'models/**/*.ts'
+  ],
+  coverageDirectory: 'coverage',
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
+};
+```
+
+#### Test Environment Variables
+```env
+# Test database configuration (optional)
+NODE_ENV=test
+DB_NAME=book_management_test
+DB_CONNECTION_LIMIT=2
+LOG_LEVEL=error
+JWT_SECRET=test-jwt-secret-key
+```
+
+### Writing Tests
+
+#### Service Layer Tests
+```typescript
+// Example: BookService test
+import { BookService } from '../../services/BookService';
+import { query } from '../../config/database';
+
+jest.mock('../../config/database');
+const mockQuery = query as jest.MockedFunction<typeof query>;
+
+describe('BookService', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('should create a book successfully', async () => {
+    const bookData = {
+      title: 'Test Book',
+      author: 'Test Author'
+    };
+    
+    mockQuery.mockResolvedValue({ 
+      rows: [{ id: 1, ...bookData }] 
+    });
+
+    const result = await BookService.createBook(bookData);
+    
+    expect(result).toEqual({
+      id: 1,
+      title: 'Test Book',
+      author: 'Test Author'
+    });
+  });
+});
+```
+
+#### Route Integration Tests
+```typescript
+// Example: Route test with supertest
+import request from 'supertest';
+import express from 'express';
+import bookRoutes from '../../routes/bookRoutes';
+
+const app = express();
+app.use(express.json());
+app.use('/api/books', bookRoutes);
+
+describe('Book Routes', () => {
+  it('should create a book', async () => {
+    const bookData = {
+      title: 'New Book',
+      author: 'New Author'
+    };
+
+    const response = await request(app)
+      .post('/api/books')
+      .send(bookData)
+      .expect(201);
+
+    expect(response.body.success).toBe(true);
+  });
+});
+```
+
+#### Middleware Tests
+```typescript
+// Example: Middleware test
+import { authenticateToken } from '../../middleware/authMiddleware';
+
+describe('Auth Middleware', () => {
+  it('should authenticate valid token', () => {
+    const mockReq = {
+      headers: { authorization: 'Bearer valid-token' }
+    };
+    const mockRes = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn()
+    };
+    const mockNext = jest.fn();
+
+    authenticateToken(mockReq, mockRes, mockNext);
+
+    expect(mockNext).toHaveBeenCalled();
+  });
+});
+```
+
+### Test Best Practices
+
+#### Mocking Guidelines
+1. **Database Operations**: Always mock database queries
+2. **External Dependencies**: Mock third-party libraries
+3. **Environment Variables**: Use test-specific values
+4. **File System**: Mock file operations
+5. **Network Requests**: Mock HTTP calls
+
+#### Test Organization
+1. **Descriptive Names**: Use clear, descriptive test names
+2. **Arrange-Act-Assert**: Follow AAA pattern
+3. **Single Responsibility**: One assertion per test when possible
+4. **Test Data**: Use realistic but minimal test data
+5. **Cleanup**: Reset mocks between tests
+
+#### Performance Testing
+```bash
+# Run tests with timing information
+npx jest --verbose --detectOpenHandles
+
+# Profile test performance
+npx jest --logHeapUsage
+
+# Run tests with maximum workers
+npx jest --maxWorkers=4
+```
+
+### Continuous Integration
+
+#### GitHub Actions Example
+```yaml
+name: Tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+      - run: npm ci
+      - run: npm run test:ci
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ./coverage/lcov.info
+```
+
+### Troubleshooting Tests
+
+#### Common Issues
+```bash
+# Clear Jest cache
+npx jest --clearCache
+
+# Run tests with debugging
+node --inspect-brk node_modules/.bin/jest --runInBand
+
+# Check for memory leaks
+npx jest --detectOpenHandles --forceExit
+
+# Run specific test with verbose output
+npx jest --testNamePattern="specific test" --verbose
+```
+
+#### Database Test Issues
+- Ensure test database is separate from development
+- Use database transactions for test isolation
+- Mock database operations for unit tests
+- Use test containers for integration tests
 
 ## 🧪 Development
 

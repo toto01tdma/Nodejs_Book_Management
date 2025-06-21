@@ -15,6 +15,11 @@ export class BookService {
     return this.dbType;
   }
 
+  // Reset database type cache (for testing)
+  static resetDbType(): void {
+    this.dbType = null;
+  }
+
   // Get all books with optional filters and pagination
   static async getAllBooks(filters: IBookFilters = {}): Promise<IPaginatedResult<IBook>> {
     const startTime = Date.now();
@@ -241,12 +246,12 @@ export class BookService {
     
     if (isMySQL) {
       const result = await query('DELETE FROM books WHERE id = ?', [id]);
-      const success = (result.rows as any).affectedRows > 0;
+      const success = (result as any).affectedRows > 0;
       logPerformance('deleteBook', startTime, { id, success });
       return success;
     } else {
       const result = await query('DELETE FROM books WHERE id = $1 RETURNING id', [id]);
-      const success = result.rows.length > 0;
+      const success = result && result.rows && result.rows.length > 0;
       logPerformance('deleteBook', startTime, { id, success });
       return success;
     }

@@ -23,7 +23,7 @@
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "types": ["node"]
+    "types": ["node", "jest"]
   },
   "include": [
     "server.ts",
@@ -31,8 +31,11 @@
     "config/**/*",
     "models/**/*",
     "routes/**/*",
-    "middleware/**/*"
-, "services/BookService.ts", "services/UserService.ts"  ],
+    "middleware/**/*",
+    "services/**/*",
+    "tests/**/*",
+    "utils/**/*"
+  ],
   "exclude": [
     "node_modules",
     "dist",
