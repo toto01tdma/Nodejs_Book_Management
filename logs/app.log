@@ -416,3 +416,15 @@
 {"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-21 11:29:19"}
 {"duration":"10ms","level":"info","message":"Performance: getStats","operation":"getStats","timestamp":"2025-06-21 11:29:58"}
 {"duration":"6ms","filters":{"limit":10,"offset":0},"level":"info","message":"Performance: getAllBooks","operation":"getAllBooks","resultCount":10,"timestamp":"2025-06-21 11:29:59","total":14}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-21 11:39:27"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-21 11:39:27"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-21 11:39:27"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-21 11:39:27"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-21 11:39:40"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-21 11:39:40"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-21 11:39:40"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-21 11:39:40"}
+{"level":"info","message":"Starting Book Management System server...","timestamp":"2025-06-21 11:45:13"}
+{"level":"info","message":"Database connected and initialized successfully","timestamp":"2025-06-21 11:45:13"}
+{"databaseConnected":true,"databaseType":"POSTGRESQL","level":"info","message":"Server running at http://localhost:3000","nodeEnv":"development","port":"3000","timestamp":"2025-06-21 11:45:13"}
+{"level":"info","message":"Book Management System is ready!","timestamp":"2025-06-21 11:45:13"}
