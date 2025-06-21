@@ -79,8 +79,18 @@ router.get('/', [
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   query('search').optional().trim(),
-  query('genre').optional().trim(),
-  query('author').optional().trim(),
+  query('genre').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      return value.every(item => typeof item === 'string' && item.trim().length > 0);
+    }
+    return typeof value === 'string';
+  }).withMessage('Genre must be a string or array of strings'),
+  query('author').optional().custom((value) => {
+    if (Array.isArray(value)) {
+      return value.every(item => typeof item === 'string' && item.trim().length > 0);
+    }
+    return typeof value === 'string';
+  }).withMessage('Author must be a string or array of strings'),
   query('year').optional().isInt().withMessage('Year must be a number'),
   handleValidationErrors
 ], async (req: express.Request, res: express.Response): Promise<void> => {
@@ -89,10 +99,17 @@ router.get('/', [
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
+    // Parse genre and author filters (can be arrays)
+    const parseArrayParam = (param: any): string | string[] | undefined => {
+      if (!param) return undefined;
+      if (Array.isArray(param)) return param.filter(Boolean);
+      return param;
+    };
+
     const filters = {
       search: req.query.search as string,
-      genre: req.query.genre as string,
-      author: req.query.author as string,
+      genre: parseArrayParam(req.query.genre),
+      author: parseArrayParam(req.query.author),
       year: req.query.year ? parseInt(req.query.year as string) : undefined,
       limit,
       offset

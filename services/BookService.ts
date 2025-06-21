@@ -43,17 +43,35 @@ export class BookService {
     }
 
     if (genre) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      whereConditions.push(`genre ILIKE ${placeholder}`);
-      queryParams.push(`%${genre}%`);
-      paramIndex++;
+      if (Array.isArray(genre) && genre.length > 0) {
+        const genrePlaceholders = genre.map(() => {
+          const placeholder = isMySQL ? '?' : `$${paramIndex++}`;
+          return placeholder;
+        });
+        whereConditions.push(`genre IN (${genrePlaceholders.join(', ')})`);
+        queryParams.push(...genre);
+      } else if (typeof genre === 'string') {
+        const placeholder = isMySQL ? '?' : `$${paramIndex}`;
+        whereConditions.push(`genre ILIKE ${placeholder}`);
+        queryParams.push(`%${genre}%`);
+        paramIndex++;
+      }
     }
 
     if (author) {
-      const placeholder = isMySQL ? '?' : `$${paramIndex}`;
-      whereConditions.push(`author ILIKE ${placeholder}`);
-      queryParams.push(`%${author}%`);
-      paramIndex++;
+      if (Array.isArray(author) && author.length > 0) {
+        const authorPlaceholders = author.map(() => {
+          const placeholder = isMySQL ? '?' : `$${paramIndex++}`;
+          return placeholder;
+        });
+        whereConditions.push(`author IN (${authorPlaceholders.join(', ')})`);
+        queryParams.push(...author);
+      } else if (typeof author === 'string') {
+        const placeholder = isMySQL ? '?' : `$${paramIndex}`;
+        whereConditions.push(`author ILIKE ${placeholder}`);
+        queryParams.push(`%${author}%`);
+        paramIndex++;
+      }
     }
 
     if (year) {

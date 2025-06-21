@@ -90,6 +90,123 @@
       opacity: 0;
       transition: opacity 300ms ease-out;
     }
+
+    /* Multi-Select Dropdown Styles */
+    .multi-select-dropdown {
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      position: relative;
+    }
+
+    .multi-select-dropdown:focus {
+      outline: none;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .selected-items {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 24px;
+      align-items: center;
+    }
+
+    .selected-item {
+      background-color: #3b82f6;
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .selected-item .remove {
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .selected-item .remove:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 2px;
+    }
+
+    .multi-select-options {
+      border-top: none;
+    }
+
+    .multi-select-option {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color 150ms;
+    }
+
+    .multi-select-option:hover {
+      background-color: #f3f4f6;
+    }
+
+    .multi-select-option.selected {
+      background-color: #eff6ff;
+      color: #3b82f6;
+    }
+
+    .multi-select-option input[type="checkbox"] {
+      margin: 0;
+    }
+
+    .multi-select-placeholder {
+      color: #9ca3af;
+    }
+
+    /* Search container styles */
+    .search-container {
+      background-color: #f9fafb;
+    }
+
+    .search-container input:focus {
+      outline: none;
+    }
+
+    /* No results message */
+    .no-results {
+      padding: 12px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 14px;
+      font-style: italic;
+    }
+
+    /* Highlight matching text */
+    .highlight {
+      background-color: #fef3c7;
+      font-weight: 600;
+    }
+
+    /* Improved scrollbar for options */
+    .multi-select-options div::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .multi-select-options div::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+
+    .multi-select-options div::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+
+    .multi-select-options div::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -206,22 +323,54 @@
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Genre</label>
-          <select id="genreFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="">All Genres</option>
-            <% genres.forEach(genre => { %>
-              <option value="<%= genre %>"><%= genre %></option>
-            <% }) %>
-          </select>
+          <div class="relative">
+            <div id="genreFilter" class="multi-select-dropdown w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer bg-white">
+              <div class="selected-items" data-placeholder="Select genres...">Select genres...</div>
+              <i class="fas fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+            </div>
+            <div id="genreDropdown" class="multi-select-options absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden">
+              <div class="search-container p-2 border-b border-gray-200">
+                <div class="relative mb-2">
+                  <input type="text" id="genreSearch" placeholder="Search genres..." 
+                         class="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <button type="button" id="genreSelectAll" class="text-blue-600 hover:text-blue-800 font-medium">Select All</button>
+                  <button type="button" id="genreDeselectAll" class="text-gray-600 hover:text-gray-800 font-medium">Deselect All</button>
+                </div>
+              </div>
+              <div id="genreOptions" class="max-h-48 overflow-y-auto">
+                <!-- Options will be populated dynamically -->
+              </div>
+            </div>
+          </div>
         </div>
         
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Author</label>
-          <select id="authorFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="">All Authors</option>
-            <% authors.forEach(author => { %>
-              <option value="<%= author %>"><%= author %></option>
-            <% }) %>
-          </select>
+          <div class="relative">
+            <div id="authorFilter" class="multi-select-dropdown w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent cursor-pointer bg-white">
+              <div class="selected-items" data-placeholder="Select authors...">Select authors...</div>
+              <i class="fas fa-chevron-down absolute right-3 top-3 text-gray-400 pointer-events-none"></i>
+            </div>
+            <div id="authorDropdown" class="multi-select-options absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg hidden">
+              <div class="search-container p-2 border-b border-gray-200">
+                <div class="relative mb-2">
+                  <input type="text" id="authorSearch" placeholder="Search authors..." 
+                         class="w-full pl-8 pr-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                  <i class="fas fa-search absolute left-2.5 top-2.5 text-gray-400 text-sm"></i>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <button type="button" id="authorSelectAll" class="text-blue-600 hover:text-blue-800 font-medium">Select All</button>
+                  <button type="button" id="authorDeselectAll" class="text-gray-600 hover:text-gray-800 font-medium">Deselect All</button>
+                </div>
+              </div>
+              <div id="authorOptions" class="max-h-48 overflow-y-auto">
+                <!-- Options will be populated dynamically -->
+              </div>
+            </div>
+          </div>
         </div>
         
         <div>

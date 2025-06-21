@@ -24,8 +24,8 @@ export interface IBookUpdate {
 
 export interface IBookFilters {
   search?: string;
-  genre?: string;
-  author?: string;
+  genre?: string | string[];
+  author?: string | string[];
   year?: number;
   limit?: number;
   offset?: number;

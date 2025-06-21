@@ -43,8 +43,6 @@ app.get('/', async (req, res) => {
     res.render('index', { 
       title: 'Book Management System',
       stats: { totalBooks: 0, totalAuthors: 0, totalGenres: 0, recentBooks: 0 },
-      genres: [],
-      authors: [],
       dbConnected: false
     });
     return;
@@ -52,14 +50,10 @@ app.get('/', async (req, res) => {
 
   try {
     const stats = await BookService.getStats();
-    const genres = await BookService.getGenres();
-    const authors = await BookService.getAuthors();
     
     res.render('index', { 
       title: 'Book Management System',
       stats,
-      genres,
-      authors,
       dbConnected: true
     });
   } catch (error) {
@@ -67,8 +61,6 @@ app.get('/', async (req, res) => {
     res.render('index', { 
       title: 'Book Management System',
       stats: { totalBooks: 0, totalAuthors: 0, totalGenres: 0, recentBooks: 0 },
-      genres: [],
-      authors: [],
       dbConnected: false
     });
   }

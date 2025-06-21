@@ -16,12 +16,21 @@ class BookManager {
     this.lastRenderTime = 0; // Throttle rendering
     this.renderThrottleMs = 16; // ~60fps
 
+    // Multi-select state
+    this.selectedGenres = [];
+    this.selectedAuthors = [];
+    this.availableGenres = [];
+    this.availableAuthors = [];
+    this.filteredGenres = [];
+    this.filteredAuthors = [];
+
     this.initializeEventListeners();
     this.initializeApp();
   }
 
   async initializeApp() {
     await this.checkDatabaseStatus();
+    await this.loadFilterOptions();
     this.loadBooks();
   }
 
@@ -47,11 +56,13 @@ class BookManager {
     const clearFilters = document.getElementById('clearFilters');
 
     if (searchInput) searchInput.addEventListener('input', this.debounce(() => this.applyFilters(), 300));
-    if (genreFilter) genreFilter.addEventListener('change', () => this.applyFilters());
-    if (authorFilter) authorFilter.addEventListener('change', () => this.applyFilters());
     if (yearFilter) yearFilter.addEventListener('input', this.debounce(() => this.applyFilters(), 300));
     if (limitSelect) limitSelect.addEventListener('change', () => this.changeLimit());
     if (clearFilters) clearFilters.addEventListener('click', () => this.clearFilters());
+
+    // Multi-select dropdowns
+    if (genreFilter) this.initializeMultiSelect('genre');
+    if (authorFilter) this.initializeMultiSelect('author');
 
     // Modal click outside to close
     document.getElementById('bookModal').addEventListener('click', (e) => {
@@ -182,24 +193,39 @@ class BookManager {
     try {
       this.showLoading(true);
       
-      const params = new URLSearchParams({
-        page: this.currentPage.toString(),
-        limit: this.limit.toString(),
-        ...this.filters
+      // Build query parameters properly handling arrays
+      const params = new URLSearchParams();
+      params.append('page', this.currentPage.toString());
+      params.append('limit', this.limit.toString());
+      
+      // Handle filters properly (arrays need special handling)
+      Object.entries(this.filters).forEach(([key, value]) => {
+        if (Array.isArray(value)) {
+          // For arrays, append each value separately
+          value.forEach(item => params.append(key, item));
+        } else if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value.toString());
+        }
       });
+
+      console.log('Loading books with params:', params.toString());
+      console.log('Current filters:', this.filters);
 
       const cacheKey = `books_${params.toString()}`;
       const cached = this.getFromCache(cacheKey, 10000); // 10 second cache
       
       let result;
       if (cached) {
+        console.log('Using cached result for:', cacheKey);
         result = cached;
       } else {
+        console.log('Making API request to:', `/api/books?${params}`);
         const response = await this.makeRequest(`/api/books?${params}`);
         result = await response.json();
         
         if (result.success) {
           this.setCache(cacheKey, result);
+          console.log('API request successful, cached result');
         }
       }
 
@@ -435,17 +461,25 @@ class BookManager {
     const newFilters = {};
     
     const search = document.getElementById('searchInput')?.value.trim();
-    const genre = document.getElementById('genreFilter')?.value;
-    const author = document.getElementById('authorFilter')?.value;
     const year = document.getElementById('yearFilter')?.value;
 
     if (search) newFilters.search = search;
-    if (genre) newFilters.genre = genre;
-    if (author) newFilters.author = author;
     if (year) newFilters.year = year;
 
-    // Only reload if filters actually changed
-    if (JSON.stringify(this.filters) !== JSON.stringify(newFilters)) {
+    // Add multi-select filters
+    if (this.selectedGenres.length > 0) {
+      newFilters.genre = [...this.selectedGenres].sort(); // Sort for consistent comparison
+    }
+    
+    if (this.selectedAuthors.length > 0) {
+      newFilters.author = [...this.selectedAuthors].sort(); // Sort for consistent comparison
+    }
+
+    // More robust filter comparison
+    const filtersChanged = this.hasFiltersChanged(this.filters, newFilters);
+    
+    if (filtersChanged) {
+      console.log('Filters changed:', { old: this.filters, new: newFilters });
       this.filters = newFilters;
       this.currentPage = 1;
       this.requestCache.clear(); // Clear cache when filters change
@@ -453,12 +487,70 @@ class BookManager {
     }
   }
 
+  // Helper method for robust filter comparison
+  hasFiltersChanged(oldFilters, newFilters) {
+    // Get all unique keys from both objects
+    const allKeys = new Set([...Object.keys(oldFilters), ...Object.keys(newFilters)]);
+    
+    for (const key of allKeys) {
+      const oldValue = oldFilters[key];
+      const newValue = newFilters[key];
+      
+      // If one exists and the other doesn't
+      if ((oldValue === undefined) !== (newValue === undefined)) {
+        return true;
+      }
+      
+      // If both are arrays, compare them
+      if (Array.isArray(oldValue) && Array.isArray(newValue)) {
+        if (oldValue.length !== newValue.length) {
+          return true;
+        }
+        // Sort both arrays for comparison
+        const sortedOld = [...oldValue].sort();
+        const sortedNew = [...newValue].sort();
+        if (sortedOld.join(',') !== sortedNew.join(',')) {
+          return true;
+        }
+      } else if (oldValue !== newValue) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
   clearFilters() {
-    const elements = ['searchInput', 'genreFilter', 'authorFilter', 'yearFilter'];
+    // Clear text inputs
+    const elements = ['searchInput', 'yearFilter'];
     elements.forEach(id => {
       const element = document.getElementById(id);
       if (element) element.value = '';
     });
+    
+    // Clear multi-select filters
+    this.selectedGenres = [];
+    this.selectedAuthors = [];
+    
+    // Update multi-select displays
+    this.updateMultiSelectDisplay('genre');
+    this.updateMultiSelectDisplay('author');
+    
+    // Clear search inputs and reset options
+    const genreSearch = document.getElementById('genreSearch');
+    const authorSearch = document.getElementById('authorSearch');
+    if (genreSearch) {
+      genreSearch.value = '';
+      this.renderMultiSelectOptions('genre', this.availableGenres);
+    }
+    if (authorSearch) {
+      authorSearch.value = '';
+      this.renderMultiSelectOptions('author', this.availableAuthors);
+    }
+
+    // Uncheck all checkboxes
+    document.querySelectorAll('#genreOptions input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.querySelectorAll('#authorOptions input[type="checkbox"]').forEach(cb => cb.checked = false);
     
     this.filters = {};
     this.currentPage = 1;
@@ -623,6 +715,9 @@ class BookManager {
         // Reload books and update stats
         await this.loadBooks();
         this.updateStats();
+        
+        // Refresh filter options to include any new genres/authors
+        await this.loadFilterOptions();
       } else {
         if (response.status === 401) {
           this.showError('Please login to perform this action.');
@@ -698,6 +793,9 @@ class BookManager {
           // Reload books and update stats
           await this.loadBooks();
           this.updateStats();
+          
+          // Refresh filter options in case deleted book was last with certain genre/author
+          await this.loadFilterOptions();
         } else {
           if (response.status === 401) {
             this.showError('Please login to perform this action.');
@@ -809,6 +907,452 @@ class BookManager {
     } catch (error) {
       console.error('Error loading book:', error);
       this.showError('Failed to load book details');
+    }
+  }
+
+  // Load filter options from API
+  async loadFilterOptions() {
+    try {
+      console.log('Loading filter options...');
+      
+      // Load genres
+      console.log('Making API request to: /api/books/filters/genres');
+      const genresResponse = await this.makeRequest('/api/books/filters/genres');
+      const genresResult = await genresResponse.json();
+      if (genresResult.success) {
+        console.log('Loaded genres:', genresResult.data);
+        this.availableGenres = genresResult.data;
+      }
+
+      // Load authors
+      console.log('Making API request to: /api/books/filters/authors');
+      const authorsResponse = await this.makeRequest('/api/books/filters/authors');
+      const authorsResult = await authorsResponse.json();
+      if (authorsResult.success) {
+        console.log('Loaded authors:', authorsResult.data);
+        this.availableAuthors = authorsResult.data;
+      }
+
+      // Populate dropdowns
+      this.populateMultiSelect('genre', this.availableGenres);
+      this.populateMultiSelect('author', this.availableAuthors);
+      
+      console.log('Filter options loaded and dropdowns updated');
+    } catch (error) {
+      console.error('Error loading filter options:', error);
+    }
+  }
+
+  // Initialize multi-select dropdown
+  initializeMultiSelect(type) {
+    const dropdown = document.getElementById(`${type}Filter`);
+    const optionsContainer = document.getElementById(`${type}Dropdown`);
+    
+    if (!dropdown || !optionsContainer) return;
+
+    // Toggle dropdown on click
+    dropdown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.toggleMultiSelectDropdown(type);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && !optionsContainer.contains(e.target)) {
+        this.closeMultiSelectDropdown(type);
+      }
+    });
+
+    // Make dropdown focusable
+    dropdown.setAttribute('tabindex', '0');
+    
+    // Handle keyboard navigation
+    dropdown.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        this.toggleMultiSelectDropdown(type);
+      }
+    });
+  }
+
+  // Populate multi-select options
+  populateMultiSelect(type, options) {
+    const optionsContainer = document.getElementById(`${type}Options`);
+    if (!optionsContainer) return;
+
+    // Store original options
+    if (type === 'genre') {
+      this.filteredGenres = [...options];
+    } else {
+      this.filteredAuthors = [...options];
+    }
+
+    this.renderMultiSelectOptions(type, options);
+    this.setupSearchFunctionality(type);
+    this.updateSelectAllButtonsState(type);
+  }
+
+  // Render multi-select options
+  renderMultiSelectOptions(type, options) {
+    const optionsContainer = document.getElementById(`${type}Options`);
+    if (!optionsContainer) return;
+
+    optionsContainer.innerHTML = '';
+    
+    if (options.length === 0) {
+      optionsContainer.innerHTML = '<div class="no-results">No results found</div>';
+      return;
+    }
+    
+    options.forEach(option => {
+      const optionElement = document.createElement('div');
+      optionElement.className = 'multi-select-option';
+      
+      // Check if this option is currently selected
+      const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+      const isSelected = selectedArray.includes(option);
+      
+      optionElement.innerHTML = `
+        <input type="checkbox" id="${type}_${option}" value="${option}" ${isSelected ? 'checked' : ''}>
+        <label for="${type}_${option}" class="flex-1 cursor-pointer">${option}</label>
+      `;
+      
+      if (isSelected) {
+        optionElement.classList.add('selected');
+      }
+      
+      const checkbox = optionElement.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        this.handleMultiSelectChange(type, option, checkbox.checked);
+      });
+      
+      optionsContainer.appendChild(optionElement);
+    });
+  }
+
+  // Setup search functionality
+  setupSearchFunctionality(type) {
+    const searchInput = document.getElementById(`${type}Search`);
+    if (!searchInput) return;
+
+    // Remove existing event listeners to prevent duplicates
+    const newSearchInput = searchInput.cloneNode(true);
+    searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+
+    newSearchInput.addEventListener('input', this.debounce((e) => {
+      this.filterOptions(type, e.target.value);
+    }, 150));
+
+    // Prevent dropdown from closing when clicking on search input
+    newSearchInput.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    // Handle keyboard navigation in search
+    newSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        this.closeMultiSelectDropdown(type);
+        newSearchInput.blur();
+      }
+    });
+
+    // Setup select all/deselect all buttons
+    this.setupSelectAllButtons(type);
+  }
+
+  // Filter options based on search term
+  filterOptions(type, searchTerm) {
+    const originalOptions = type === 'genre' ? this.availableGenres : this.availableAuthors;
+    
+    if (!searchTerm.trim()) {
+      // Show all options if search is empty
+      this.renderMultiSelectOptions(type, originalOptions);
+      return;
+    }
+
+    // Filter options based on search term (case-insensitive)
+    const filteredOptions = originalOptions.filter(option =>
+      option.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    // Highlight matching text and render
+    this.renderMultiSelectOptionsWithHighlight(type, filteredOptions, searchTerm);
+  }
+
+  // Render options with highlighted search terms
+  renderMultiSelectOptionsWithHighlight(type, options, searchTerm) {
+    const optionsContainer = document.getElementById(`${type}Options`);
+    if (!optionsContainer) return;
+
+    optionsContainer.innerHTML = '';
+    
+    if (options.length === 0) {
+      optionsContainer.innerHTML = '<div class="no-results">No results found</div>';
+      return;
+    }
+    
+    options.forEach(option => {
+      const optionElement = document.createElement('div');
+      optionElement.className = 'multi-select-option';
+      
+      // Check if this option is currently selected
+      const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+      const isSelected = selectedArray.includes(option);
+      
+      // Highlight matching text
+      const highlightedText = this.highlightSearchTerm(option, searchTerm);
+      
+      optionElement.innerHTML = `
+        <input type="checkbox" id="${type}_${option}" value="${option}" ${isSelected ? 'checked' : ''}>
+        <label for="${type}_${option}" class="flex-1 cursor-pointer">${highlightedText}</label>
+      `;
+      
+      if (isSelected) {
+        optionElement.classList.add('selected');
+      }
+      
+      const checkbox = optionElement.querySelector('input');
+      checkbox.addEventListener('change', () => {
+        this.handleMultiSelectChange(type, option, checkbox.checked);
+      });
+      
+      optionsContainer.appendChild(optionElement);
+    });
+  }
+
+  // Highlight search term in text
+  highlightSearchTerm(text, searchTerm) {
+    if (!searchTerm.trim()) return text;
+    
+    const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<span class="highlight">$1</span>');
+  }
+
+  // Setup select all/deselect all buttons
+  setupSelectAllButtons(type) {
+    const selectAllBtn = document.getElementById(`${type}SelectAll`);
+    const deselectAllBtn = document.getElementById(`${type}DeselectAll`);
+
+    if (selectAllBtn) {
+      // Remove existing event listeners
+      const newSelectAllBtn = selectAllBtn.cloneNode(true);
+      selectAllBtn.parentNode.replaceChild(newSelectAllBtn, selectAllBtn);
+
+      newSelectAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.selectAllVisibleOptions(type);
+      });
+    }
+
+    if (deselectAllBtn) {
+      // Remove existing event listeners
+      const newDeselectAllBtn = deselectAllBtn.cloneNode(true);
+      deselectAllBtn.parentNode.replaceChild(newDeselectAllBtn, deselectAllBtn);
+
+      newDeselectAllBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.deselectAllVisibleOptions(type);
+      });
+    }
+  }
+
+  // Select all visible options
+  selectAllVisibleOptions(type) {
+    const optionsContainer = document.getElementById(`${type}Options`);
+    const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+
+    checkboxes.forEach(checkbox => {
+      const value = checkbox.value;
+      if (!checkbox.checked && !selectedArray.includes(value)) {
+        checkbox.checked = true;
+        selectedArray.push(value);
+        
+        // Update visual state
+        const optionElement = checkbox.closest('.multi-select-option');
+        if (optionElement) {
+          optionElement.classList.add('selected');
+        }
+      }
+    });
+
+    this.updateMultiSelectDisplay(type);
+    this.updateSelectAllButtonsState(type);
+    this.applyFilters();
+  }
+
+  // Deselect all visible options
+  deselectAllVisibleOptions(type) {
+    const optionsContainer = document.getElementById(`${type}Options`);
+    const checkboxes = optionsContainer.querySelectorAll('input[type="checkbox"]');
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+
+    checkboxes.forEach(checkbox => {
+      const value = checkbox.value;
+      if (checkbox.checked) {
+        checkbox.checked = false;
+        
+        // Remove from selected array
+        const index = selectedArray.indexOf(value);
+        if (index > -1) {
+          selectedArray.splice(index, 1);
+        }
+        
+        // Update visual state
+        const optionElement = checkbox.closest('.multi-select-option');
+        if (optionElement) {
+          optionElement.classList.remove('selected');
+        }
+      }
+    });
+
+    this.updateMultiSelectDisplay(type);
+    this.updateSelectAllButtonsState(type);
+    this.applyFilters();
+  }
+
+  // Update select all buttons state
+  updateSelectAllButtonsState(type) {
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+    const selectAllBtn = document.getElementById(`${type}SelectAll`);
+    const deselectAllBtn = document.getElementById(`${type}DeselectAll`);
+
+    if (selectAllBtn && deselectAllBtn) {
+      const count = selectedArray.length;
+      if (count > 0) {
+        selectAllBtn.textContent = `Select All`;
+        deselectAllBtn.textContent = `Deselect All (${count})`;
+      } else {
+        selectAllBtn.textContent = `Select All`;
+        deselectAllBtn.textContent = `Deselect All`;
+      }
+    }
+  }
+
+  // Toggle multi-select dropdown
+  toggleMultiSelectDropdown(type) {
+    const optionsContainer = document.getElementById(`${type}Dropdown`);
+    const dropdown = document.getElementById(`${type}Filter`);
+    
+    if (!optionsContainer || !dropdown) return;
+
+    const isHidden = optionsContainer.classList.contains('hidden');
+    
+    // Close all other dropdowns first
+    ['genre', 'author'].forEach(otherType => {
+      if (otherType !== type) {
+        this.closeMultiSelectDropdown(otherType);
+      }
+    });
+
+    if (isHidden) {
+      optionsContainer.classList.remove('hidden');
+      dropdown.classList.add('ring-2', 'ring-blue-500');
+      
+      // Focus on search input when opening
+      setTimeout(() => {
+        const searchInput = document.getElementById(`${type}Search`);
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }, 100);
+    } else {
+      optionsContainer.classList.add('hidden');
+      dropdown.classList.remove('ring-2', 'ring-blue-500');
+      
+      // Clear search when closing
+      const searchInput = document.getElementById(`${type}Search`);
+      if (searchInput) {
+        searchInput.value = '';
+        // Reset to show all options
+        const originalOptions = type === 'genre' ? this.availableGenres : this.availableAuthors;
+        this.renderMultiSelectOptions(type, originalOptions);
+      }
+    }
+  }
+
+  // Close multi-select dropdown
+  closeMultiSelectDropdown(type) {
+    const optionsContainer = document.getElementById(`${type}Dropdown`);
+    const dropdown = document.getElementById(`${type}Filter`);
+    
+    if (optionsContainer) optionsContainer.classList.add('hidden');
+    if (dropdown) dropdown.classList.remove('ring-2', 'ring-blue-500');
+  }
+
+  // Handle multi-select change
+  handleMultiSelectChange(type, value, isChecked) {
+    console.log(`Multi-select change: ${type}, ${value}, ${isChecked}`);
+    
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+    console.log(`Current ${type} selections:`, [...selectedArray]);
+    
+    if (isChecked) {
+      if (!selectedArray.includes(value)) {
+        selectedArray.push(value);
+        console.log(`Added ${value} to ${type} selections`);
+      }
+    } else {
+      const index = selectedArray.indexOf(value);
+      if (index > -1) {
+        selectedArray.splice(index, 1);
+        console.log(`Removed ${value} from ${type} selections`);
+      }
+    }
+    
+    console.log(`Updated ${type} selections:`, [...selectedArray]);
+    
+    // Update the option's selected state in the UI
+    const optionElement = document.getElementById(`${type}_${value}`)?.closest('.multi-select-option');
+    if (optionElement) {
+      if (isChecked) {
+        optionElement.classList.add('selected');
+      } else {
+        optionElement.classList.remove('selected');
+      }
+    }
+    
+    this.updateMultiSelectDisplay(type);
+    this.updateSelectAllButtonsState(type);
+    this.applyFilters();
+  }
+
+  // Update multi-select display
+  updateMultiSelectDisplay(type) {
+    const dropdown = document.getElementById(`${type}Filter`);
+    const selectedItemsContainer = dropdown?.querySelector('.selected-items');
+    
+    if (!selectedItemsContainer) return;
+
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+    const placeholder = selectedItemsContainer.getAttribute('data-placeholder');
+    
+    if (selectedArray.length === 0) {
+      selectedItemsContainer.innerHTML = `<span class="multi-select-placeholder">${placeholder}</span>`;
+    } else {
+      selectedItemsContainer.innerHTML = selectedArray.map(item => `
+        <span class="selected-item">
+          ${item}
+          <span class="remove" onclick="bookManager.removeMultiSelectItem('${type}', '${item}')">&times;</span>
+        </span>
+      `).join('');
+    }
+  }
+
+  // Remove multi-select item
+  removeMultiSelectItem(type, value) {
+    const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
+    const index = selectedArray.indexOf(value);
+    
+    if (index > -1) {
+      selectedArray.splice(index, 1);
+      
+      // Update checkbox state
+      const checkbox = document.getElementById(`${type}_${value}`);
+      if (checkbox) checkbox.checked = false;
+      
+      this.updateMultiSelectDisplay(type);
+      this.applyFilters();
     }
   }
 }
