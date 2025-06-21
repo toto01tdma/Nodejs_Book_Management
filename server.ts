@@ -18,13 +18,23 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Middleware
+// Middleware with production optimizations
 app.use(responseTimeMiddleware); // Add response time tracking
 app.use(httpLogger); // HTTP request logging
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(express.json({ limit: '1mb' })); // Limit JSON payload size
+app.use(express.urlencoded({ extended: true, limit: '1mb' })); // Limit URL-encoded payload size
+
+// Static file serving with caching
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static('public', {
+    maxAge: '1d', // Cache static files for 1 day
+    etag: true,
+    lastModified: true
+  }));
+} else {
+  app.use(express.static('public'));
+}
 
 // View engine setup
 app.set('view engine', 'ejs');

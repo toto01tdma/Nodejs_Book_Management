@@ -200,7 +200,6 @@ class AuthManager {
 
   // Open login modal
   openLoginModal() {
-    console.log('Opening login modal...');
     const modal = document.getElementById('authModal');
     const modalTitle = document.getElementById('authModalTitle');
     const authForm = document.getElementById('authForm');
@@ -234,7 +233,6 @@ class AuthManager {
 
   // Open register modal
   openRegisterModal() {
-    console.log('Opening register modal...');
     const modal = document.getElementById('authModal');
     const modalTitle = document.getElementById('authModalTitle');
     const authForm = document.getElementById('authForm');
@@ -411,10 +409,8 @@ class AuthManager {
 
   // Show modal
   showModal() {
-    console.log('Showing modal...');
     const modal = document.getElementById('authModal');
     const modalContent = modal.querySelector('.bg-white');
-    console.log('Modal element:', modal);
     
     if (modal && modalContent) {
       // Remove hidden class and add enter animation classes
@@ -429,8 +425,6 @@ class AuthManager {
         modal.classList.remove('auth-modal-bg-enter');
         modalContent.classList.remove('auth-modal-enter');
       });
-      
-      console.log('Modal should now be sliding up');
       
       // Focus on first input after animation starts
       setTimeout(() => {

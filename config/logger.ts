@@ -54,22 +54,24 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Create the logger
+// Create the logger with environment-based configuration
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: process.env.LOG_LEVEL || (process.env.NODE_ENV === 'production' ? 'warn' : 'info'),
   levels: logLevels,
   format: logFormat,
   transports: [
-    // Console transport
-    new winston.transports.Console({
-      format: consoleFormat
-    }),
+    // Console transport (disabled in production)
+    ...(process.env.NODE_ENV !== 'production' ? [
+      new winston.transports.Console({
+        format: consoleFormat
+      })
+    ] : []),
     
-    // File transport for all logs
+    // File transport for all logs (smaller files in production)
     new winston.transports.File({
       filename: path.join(logsDir, 'app.log'),
-      maxsize: 5242880, // 5MB
-      maxFiles: 5,
+      maxsize: process.env.NODE_ENV === 'production' ? 2097152 : 5242880, // 2MB in prod, 5MB in dev
+      maxFiles: process.env.NODE_ENV === 'production' ? 3 : 5, // Fewer files in production
       format: logFormat
     }),
     

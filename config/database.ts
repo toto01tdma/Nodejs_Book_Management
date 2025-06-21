@@ -16,7 +16,6 @@ const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 
 // Initialize the appropriate database pool with optimized settings
 if (dbType.toLowerCase() === 'mysql') {
-  // MySQL configuration - optimized for performance
   pool = mysql.createPool({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306'),
@@ -24,29 +23,28 @@ if (dbType.toLowerCase() === 'mysql') {
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
     waitForConnections: true,
-    connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10'),
-    queueLimit: 0
+    connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '8'), // Reduced from 10
+    queueLimit: 20 // Limit queue size to prevent memory issues
   });
 } else {
-  // PostgreSQL configuration - optimized for performance
   pool = new PgPool({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
     database: process.env.DB_NAME || 'book_management',
     user: process.env.DB_USER || 'postgres',
-    password: process.env.DB_PASSWORD || 'toto1234567890',
-    max: parseInt(process.env.DB_CONNECTION_LIMIT || '10'),
-    min: 2, // Minimum pool size
-    idleTimeoutMillis: 300000, // 5 minutes
-    connectionTimeoutMillis: 10000, // 10 seconds
-    maxUses: 7500, // Maximum uses per connection
+    password: process.env.DB_PASSWORD || '',
+    max: parseInt(process.env.DB_CONNECTION_LIMIT || '8'), // Reduced from 10
+    min: 1, // Reduced from 2 to save memory
+    idleTimeoutMillis: 180000, // 3 minutes (reduced from 5)
+    connectionTimeoutMillis: 8000, // 8 seconds (reduced from 10)
+    maxUses: 5000, // Reduced from 7500 to prevent memory leaks
     // Performance optimizations
     keepAlive: true,
     keepAliveInitialDelayMillis: 0,
     allowExitOnIdle: true,
     // Statement timeout
-    statement_timeout: 30000, // 30 seconds
-    query_timeout: 30000, // 30 seconds
+    statement_timeout: 20000, // 20 seconds (reduced from 30)
+    query_timeout: 20000, // 20 seconds (reduced from 30)
     // Application name for monitoring
     application_name: 'book_management_system'
   });

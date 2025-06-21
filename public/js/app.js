@@ -10,11 +10,16 @@ class BookManager {
     this.total = 0;
     this.dbConnected = window.initialDbStatus || false;
     
-    // Performance optimizations
+    // Performance optimizations with memory limits
     this.requestCache = new Map(); // Cache for API requests
     this.pendingRequests = new Map(); // Prevent duplicate requests
     this.lastRenderTime = 0; // Throttle rendering
     this.renderThrottleMs = 16; // ~60fps
+    this.maxCacheSize = 30; // Reduced cache size
+    this.maxPendingRequests = 5; // Limit concurrent requests
+    
+    // DOM element cache for performance
+    this.domCache = new Map();
 
     // Multi-select state
     this.selectedGenres = [];
@@ -23,6 +28,9 @@ class BookManager {
     this.availableAuthors = [];
     this.filteredGenres = [];
     this.filteredAuthors = [];
+
+    // Cleanup interval to prevent memory leaks
+    this.cleanupInterval = setInterval(() => this.cleanup(), 300000); // 5 minutes
 
     this.initializeEventListeners();
     this.initializeApp();
@@ -156,20 +164,75 @@ class BookManager {
       timestamp: Date.now()
     });
     
-    // Cleanup old cache entries
-    if (this.requestCache.size > 50) {
-      const oldestKey = this.requestCache.keys().next().value;
-      this.requestCache.delete(oldestKey);
+    // Cleanup old cache entries more efficiently
+    if (this.requestCache.size > this.maxCacheSize) {
+      const entries = Array.from(this.requestCache.entries());
+      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+      
+      // Remove oldest 30% of entries
+      const toRemove = Math.floor(entries.length * 0.3);
+      for (let i = 0; i < toRemove; i++) {
+        this.requestCache.delete(entries[i][0]);
+      }
     }
   }
 
-  // Prevent duplicate requests
+  // DOM element caching for better performance
+  $(selector) {
+    if (!this.domCache.has(selector)) {
+      this.domCache.set(selector, document.querySelector(selector));
+    }
+    return this.domCache.get(selector);
+  }
+
+  // Memory cleanup method
+  cleanup() {
+    // Clear old cache entries
+    const now = Date.now();
+    const maxAge = 600000; // 10 minutes
+    
+    for (const [key, value] of this.requestCache.entries()) {
+      if (now - value.timestamp > maxAge) {
+        this.requestCache.delete(key);
+      }
+    }
+    
+    // Clear completed pending requests
+    for (const [key, promise] of this.pendingRequests.entries()) {
+      if (promise.settled) {
+        this.pendingRequests.delete(key);
+      }
+    }
+    
+    // Clear DOM cache if it gets too large
+    if (this.domCache.size > 50) {
+      this.domCache.clear();
+    }
+  }
+
+  // Cleanup on destroy
+  destroy() {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    this.requestCache.clear();
+    this.pendingRequests.clear();
+    this.domCache.clear();
+  }
+
+  // Prevent duplicate requests with better memory management
   async makeRequest(url, options = {}) {
     const requestKey = `${options.method || 'GET'}_${url}`;
     
     // Return pending request if exists
     if (this.pendingRequests.has(requestKey)) {
       return this.pendingRequests.get(requestKey);
+    }
+
+    // Check if we have too many pending requests
+    if (this.pendingRequests.size >= this.maxPendingRequests) {
+      // Wait a bit and try again
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     // Make new request
@@ -208,24 +271,18 @@ class BookManager {
         }
       });
 
-      console.log('Loading books with params:', params.toString());
-      console.log('Current filters:', this.filters);
-
       const cacheKey = `books_${params.toString()}`;
       const cached = this.getFromCache(cacheKey, 10000); // 10 second cache
       
       let result;
       if (cached) {
-        console.log('Using cached result for:', cacheKey);
         result = cached;
       } else {
-        console.log('Making API request to:', `/api/books?${params}`);
         const response = await this.makeRequest(`/api/books?${params}`);
         result = await response.json();
         
         if (result.success) {
           this.setCache(cacheKey, result);
-          console.log('API request successful, cached result');
         }
       }
 
@@ -479,7 +536,6 @@ class BookManager {
     const filtersChanged = this.hasFiltersChanged(this.filters, newFilters);
     
     if (filtersChanged) {
-      console.log('Filters changed:', { old: this.filters, new: newFilters });
       this.filters = newFilters;
       this.currentPage = 1;
       this.requestCache.clear(); // Clear cache when filters change
@@ -913,31 +969,23 @@ class BookManager {
   // Load filter options from API
   async loadFilterOptions() {
     try {
-      console.log('Loading filter options...');
-      
       // Load genres
-      console.log('Making API request to: /api/books/filters/genres');
       const genresResponse = await this.makeRequest('/api/books/filters/genres');
       const genresResult = await genresResponse.json();
       if (genresResult.success) {
-        console.log('Loaded genres:', genresResult.data);
         this.availableGenres = genresResult.data;
       }
 
       // Load authors
-      console.log('Making API request to: /api/books/filters/authors');
       const authorsResponse = await this.makeRequest('/api/books/filters/authors');
       const authorsResult = await authorsResponse.json();
       if (authorsResult.success) {
-        console.log('Loaded authors:', authorsResult.data);
         this.availableAuthors = authorsResult.data;
       }
 
       // Populate dropdowns
       this.populateMultiSelect('genre', this.availableGenres);
       this.populateMultiSelect('author', this.availableAuthors);
-      
-      console.log('Filter options loaded and dropdowns updated');
     } catch (error) {
       console.error('Error loading filter options:', error);
     }
@@ -1282,25 +1330,18 @@ class BookManager {
 
   // Handle multi-select change
   handleMultiSelectChange(type, value, isChecked) {
-    console.log(`Multi-select change: ${type}, ${value}, ${isChecked}`);
-    
     const selectedArray = type === 'genre' ? this.selectedGenres : this.selectedAuthors;
-    console.log(`Current ${type} selections:`, [...selectedArray]);
     
     if (isChecked) {
       if (!selectedArray.includes(value)) {
         selectedArray.push(value);
-        console.log(`Added ${value} to ${type} selections`);
       }
     } else {
       const index = selectedArray.indexOf(value);
       if (index > -1) {
         selectedArray.splice(index, 1);
-        console.log(`Removed ${value} from ${type} selections`);
       }
     }
-    
-    console.log(`Updated ${type} selections:`, [...selectedArray]);
     
     // Update the option's selected state in the UI
     const optionElement = document.getElementById(`${type}_${value}`)?.closest('.multi-select-option');
