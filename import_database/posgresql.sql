@@ -50,7 +50,7 @@ INSERT INTO books (title, author, published_year, genre) VALUES
 ('Pride and Prejudice', 'Jane Austen', 1813, 'Romance'),
 ('The Catcher in the Rye', 'J.D. Salinger', 1951, 'Fiction');
 
--- Insert sample admin user (password: Admin123!)
--- Password hash generated with bcrypt for 'Admin123!'
+-- Insert sample admin user (password: 1234567890)
+-- Password hash generated with bcrypt for '1234567890'
 INSERT INTO users (username, email, password_hash, role) VALUES
-('admin', 'admin@bookmanagement.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6j4JGJ.6Nm', 'admin');
+('admin', 'admin@bookmanagement.com', '$2b$12$OntHJTfKdc0Wb3DOHU9Uo.nvh3Mkqa5fUOP297D4.8AysvEVTrWDa', 'admin');

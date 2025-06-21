@@ -45,7 +45,12 @@ class AuthManager {
         
         return { success: true };
       } else {
-        this.showError(result.message);
+        // Handle validation errors
+        if (result.errors && Array.isArray(result.errors)) {
+          this.showValidationErrors(result.errors);
+        } else {
+          this.showError(result.message);
+        }
         return { success: false, message: result.message };
       }
     } catch (error) {
@@ -78,7 +83,12 @@ class AuthManager {
         
         return { success: true };
       } else {
-        this.showError(result.message);
+        // Handle validation errors
+        if (result.errors && Array.isArray(result.errors)) {
+          this.showValidationErrors(result.errors);
+        } else {
+          this.showError(result.message);
+        }
         return { success: false, message: result.message };
       }
     } catch (error) {
@@ -495,6 +505,20 @@ class AuthManager {
       title: 'Error!',
       text: message,
       confirmButtonColor: '#dc2626'
+    });
+  }
+
+  // Show validation errors
+  showValidationErrors(errors) {
+    // Create HTML content for better formatting
+    const errorList = errors.map(error => `• ${error.msg}`).join('<br>');
+    
+    Swal.fire({
+      icon: 'error',
+      title: 'Validation Failed',
+      html: `<div style="text-align: left; line-height: 1.6;">${errorList}</div>`,
+      confirmButtonColor: '#dc2626',
+      confirmButtonText: 'OK'
     });
   }
 }

@@ -246,7 +246,8 @@ export class BookService {
     
     if (isMySQL) {
       const result = await query('DELETE FROM books WHERE id = ?', [id]);
-      const success = (result as any).affectedRows > 0;
+      // For MySQL, the affectedRows is in the rows property due to our wrapper
+      const success = (result.rows as any).affectedRows > 0;
       logPerformance('deleteBook', startTime, { id, success });
       return success;
     } else {
