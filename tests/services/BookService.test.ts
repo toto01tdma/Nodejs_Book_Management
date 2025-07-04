@@ -430,7 +430,7 @@ describe('BookService', () => {
     it('should delete a book successfully with MySQL', async () => {
       mockGetDatabaseType.mockReturnValue('mysql');
       BookService.resetDbType(); // Reset cache to pick up new mock value
-      mockQuery.mockResolvedValue({ affectedRows: 1 });
+      mockQuery.mockResolvedValue({ rows: { affectedRows: 1 } });
 
       const result = await BookService.deleteBook(1);
 

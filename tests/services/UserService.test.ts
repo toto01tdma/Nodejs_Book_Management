@@ -298,6 +298,9 @@ describe('UserService', () => {
     });
 
     it('should return null for invalid token', () => {
+      // Mock console.error to suppress error output during test
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
       mockJwt.verify.mockImplementation(() => {
         throw new Error('Invalid token');
       });
@@ -305,6 +308,10 @@ describe('UserService', () => {
       const result = UserService.verifyToken('invalid-token');
 
       expect(result).toBeNull();
+      expect(consoleSpy).toHaveBeenCalledWith('Error verifying token:', expect.any(Error));
+      
+      // Restore console.error
+      consoleSpy.mockRestore();
     });
   });
 

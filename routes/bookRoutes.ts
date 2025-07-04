@@ -4,7 +4,7 @@ import { BookService } from '../services/BookService';
 import { requireDatabase } from '../middleware/dbMiddleware';
 import { authenticateToken, optionalAuth } from '../middleware/authMiddleware';
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // Validation middleware
 const validateBook = [

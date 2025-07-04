@@ -6,7 +6,7 @@ import { requireDatabase } from '../middleware/dbMiddleware';
 import { logError } from '../config/logger';
 import { logSensitiveOperation } from '../middleware/loggingMiddleware';
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // Validation middleware
 const validateRegister = [

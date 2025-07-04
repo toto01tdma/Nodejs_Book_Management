@@ -1,7 +1,7 @@
 import express from 'express';
 import { getConnectionStatus, testConnection, initDatabase } from '../config/database';
 
-const router = express.Router();
+const router: express.Router = express.Router();
 
 // GET /api/db/status - Get database connection status
 router.get('/status', (req: express.Request, res: express.Response): void => {
